@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
+    <meta name="theme-color" content="#000000">
+    <title>Repilot</title>
+  </head>
+  <body>
+    <div id="root">
+      <h3>Linux Reader Simple</h3>
+      <p>Please Input linux file path you want to search from</p>
+      <input type="text" id="linux_file_path"/>
+      <br/>
+      <p>Please Input position in above file</p>
+      <input type="text" id="linux_function_name">
+      <br/>
+      <input type="submit" onClick="submitLinuxInfo()"/>
+      <hr/>
+      <p id="linux_result_file"></p>
+      <p id="linux_result_line_and_character"></p>
+      <p id="linux_result"></p>
+    </div>
+  </body>
+  <script>
+    const vscode1 = acquireVsCodeApi();
+    function submitLinuxInfo() {
+        const filePath = document.getElementById("linux_file_path")?.value;
+        const functionName = document.getElementById("linux_function_name")?.value;
+        if (!filePath || !functionName) {
+          console.log("dom not found 0")
+          return;
+        }
+        vscode1.postMessage({
+            type: "textDocument/definition",
+            filePath,
+            functionName
+        });
+    }
+    window.addEventListener("message", (e) => {
+        const resultFileDOM = document.getElementById("linux_result_file");
+        const resultLineAndCharacterDOM = document.getElementById("linux_result_line_and_character");
+        const resultDOM = document.getElementById("linux_result");
+        if (!resultFileDOM || !resultLineAndCharacterDOM) {
+          console.log("dom not found1")
+          return;
+        }
+        const originalMessage = typeof e === "string" ? e.data : e.data.toString();
+        let parsedMessage = {}
+        try {
+            if (typeof originalMessage === "string") parsedMessage = JSON.parse(originalMessage);
+            else if (typeof originalMessage === "object") parsedMessage = originalMessage;
+            else parsedMessage =JSON.parse(originalMessage);
+        } catch (e) {
+            console.error(e);
+        }
+        const file = parsedMessage?.file ?? "unknown";
+        const line_and_character = parsedMessage?.line_and_character ?? "unknown";
+        const results = parsedMessage?.result;
+        resultFileDOM.innerText = file
+        resultLineAndCharacterDOM.innerText = line_and_character
+        resultDOM.innerText = results;
+    })
+  </script>
+</html>

@@ -1,0 +1,77 @@
+{
+  "name": "linux-reader",
+  "displayName": "linux-reader",
+  "description": " Linux のソースコードをLLMと一緒に効率的に読むための VSCode 拡張",
+  "version": "1.0.3",
+  "type": "commonjs",
+  "icon": "logo.png",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "author": {
+    "name": "Kazuya Kurihara"
+  },
+  "license": "MIT",
+  "publisher": "coffeecupjapan",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YmBIgo/LinuxReader"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:linux-reader.helloWorld",
+    "onCommand:linux-reader.openInNewTab"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "linux-reader.helloWorld",
+        "title": "Hello World"
+      },
+      {
+        "command": "linux-reader.openInNewTab",
+        "title": "Open Linux Tab"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.100.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.25.1",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.8.3",
+    "webpack": "^5.99.7",
+    "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "@google/genai": "^1.4.0",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "ajv": "^8.17.1",
+    "bufferutil": "^4.0.9",
+    "fs": "^0.0.1-security",
+    "openai": "^5.0.1",
+    "p-wait-for": "^5.0.2",
+    "utf-8-validate": "^6.0.5",
+    "vscode-languageclient": "^9.0.1"
+  }
+}
