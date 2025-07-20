@@ -19,7 +19,7 @@ export async function getFunctionContentFromLineAndCharacter(
     .slice(line, line + 1)
     .join("\n");
   const doIncludeInFailSafeIndex = failSafeFileContent.search(/\sdo[\s]+/)
-  const defIncludeInFailSafeIndex = failSafeFileContent.search(/[\s]+def /);
+  const defIncludeInFailSafeIndex = failSafeFileContent.search(/^[\s]*def\s/);
   const arrowIncludeInFailSafeIndex = failSafeFileContent.indexOf("{");
   const failSafeIndex = [
     doIncludeInFailSafeIndex === -1 ? Infinity : doIncludeInFailSafeIndex,
@@ -40,8 +40,8 @@ export async function getFunctionContentFromLineAndCharacter(
           ? "\{"
           : " "
   const endType = startIndex === 2 ? "\}" : "end"
-  const startRegexp = new RegExp(`[\s]*${escapeRegExp(startType)}[\s\t]*`, "g")
-  const endRegexp = new RegExp(`^[\t ]*${escapeRegExp(endType)}\s*$`, "g")
+  const startRegexp = new RegExp(`\\s*${escapeRegExp(startType)}\\s*`, "g")
+  const endRegexp = new RegExp(`^\\s*${escapeRegExp(endType)}\\s*$`, "g")
   let fileResultArray = [];
   let startArrowCount = startType === " " ? 1 : 0;
   let endArrowCount = 0;
@@ -128,7 +128,7 @@ export async function getFileLineAndCharacterFromFunctionName(
     return [-1, -1];
   }
   const codeLineRegexp = new RegExp(`\\s${escapeRegExp(codeLine)}[\\s\\(\\)\\{\\|]{1}`, "g");
-  const functionNameRegexp = new RegExp(`(::|\\.|\\s)${escapeRegExp(functionName)}[\\s\\(\\)\\{\\|]{1}`, "g");
+  const functionNameRegexp = new RegExp(`\\s*${escapeRegExp(functionName)}[\\s\\(\\)\\{\\|]{1}`, "g");
   const defClassFunctionRegexp = new RegExp(`\\s(def|class)\\s+${escapeRegExp(functionName)}`, "g");
   const memberAccessFunction = functionName.split("::");
   const memberAccessFunctionName = "::" + memberAccessFunction[memberAccessFunction.length - 1];
@@ -138,6 +138,7 @@ export async function getFileLineAndCharacterFromFunctionName(
   const dotAccessFunctionRegexp = new RegExp(`${escapeRegExp(dotAccessFunctionName)}\\s*[\\(\\)\\{]*`, "g");
   const fileContentArray = fileContent.split("\n");
   let isLongComment = false;
+  console.log("dot member : ", dotAccessFunction, memberAccessFunction);
   for (let i in fileContentArray) {
     const index = isNaN(Number(i)) ? -1 : Number(i);
     const row = "\n" + fileContentArray[index] + "\n";
@@ -180,10 +181,10 @@ export async function getFileLineAndCharacterFromFunctionName(
       }
     }
     let functionIndex = row.search(codeLineRegexp);
-    if (memberAccessFunction.length > 1 && functionIndex !== -1) {
-      functionIndex = row.search(memberAccessFunctionRegexp)
-    } else if (dotAccessFunction.length > 1 && functionIndex !== -1) {
-      functionIndex = row.search(dotAccessFunctionRegexp)
+    if (dotAccessFunction.length > 1 && functionIndex !== -1) {
+      functionIndex = row.search(dotAccessFunctionRegexp);
+    } else if (memberAccessFunction.length > 1 && functionIndex !== -1) {
+      functionIndex = row.search(memberAccessFunctionRegexp);
     } else if (functionIndex !== -1) {
       functionIndex = row.search(functionNameRegexp);
     }

@@ -1,7 +1,5 @@
 import * as vscode from "vscode";
 import * as vscodelc from "vscode-languageclient/node";
-import * as cp from "child_process";
-import * as util from "util";
 import fs from "fs/promises";
 
 import {
@@ -23,12 +21,10 @@ import {
   mermaidPrompt,
   pickCandidatePromopt,
   reportPromopt,
-} from "./prompt/index_ja";
+} from "./prompt/index";
 import pWaitFor from "p-wait-for";
 
 let client: RubyLanguageClient | null;
-
-const exec = util.promisify(cp.exec);
 
 class RubyLanguageClient extends vscodelc.LanguageClient {
   // Override the default implementation for failed requests. The default
@@ -208,7 +204,7 @@ export class RubyReader {
       );
     if (currentLine === -1 && currentCharacter === -1) {
       this.sendErrorSocket(
-        `以下の内容は見つかりませんでした ${currentFunctionName} @ ${currentFilePath}...`
+        `Can not find content below. ${currentFunctionName} @ ${currentFilePath}...`
       );
     }
     this.rootLine = currentLine;
@@ -224,14 +220,14 @@ export class RubyReader {
     if (historyTree) {
       this.saySocket(historyTree);
     }
-    const question = "過去の履歴の中から検索したいハッシュ値を入力してください。末端のノードからは検索できません";
+    const question = "Input hash value of past history which you want to search from.";
     const result = await this.askSocket(question);
     const resultNumber = parseInt(result.ask);
     if (isNaN(resultNumber) || resultNumber > 999999) {
       await this.runHistoryPoint(result.ask);
       return;
     }
-    this.sendErrorSocket("ハッシュ値が見つかりませんでした。再度閉じて再試行してください");
+    this.sendErrorSocket("Can not find hash value. Please try again.");
   }
 
   async runFirstTask(
@@ -250,7 +246,7 @@ export class RubyReader {
       );
     if (currentLine === -1 && currentCharacter === -1) {
       this.sendErrorSocket(
-        `以下の内容は見つかりませんでした ${currentFunctionName} @ ${currentFilePath}...`
+        `Can not find content of ${currentFunctionName} @ ${currentFilePath}...`
       );
     }
     this.rootLine = currentLine;
@@ -279,7 +275,7 @@ export class RubyReader {
     } catch (e) {
       console.error(e);
       this.sendErrorSocket(
-        `以下の内容は見つかりませんでした ${currentFilePath}@${currentLine}:${currentCharacter}`
+        `Can not find content of ${currentFilePath}@${currentLine}:${currentCharacter}`
       );
       return;
     }
@@ -309,13 +305,13 @@ ${functionContent}
       responseJSON = JSON.parse(response);
     } catch (e) {
       console.error(e);
-      this.sendErrorSocket(`APIエラー`);
+      this.sendErrorSocket(`API Error`);
       this.saveChoiceTree();
       return;
     }
     if (!Array.isArray(responseJSON)) {
       console.error("respond JSON format is not Array...");
-      this.sendErrorSocket(`返ってきた情報が間違っています...`);
+      this.sendErrorSocket(`Returned information is wrong...`);
       this.saveChoiceTree();
       return;
     }
@@ -424,16 +420,15 @@ ${functionContent}
     let result: AskResponse | null = null;
     this.saySocket(`${askQuestion}`);
     for (;;) {
-      result = await this.askSocket(`
-表示したい詳細のインデックスを入力してください。
-  - 5 を入力すると再試行できます
-  - 6 を入力すると履歴を木構造で表示します
-  - 7 を入力すると探索レポートを生成します
-  - 8 を入力すると現在のファイルを表示します
-  - 9 を入力すると現在の関数のマーメイド図を生成します
-  - 10 を入力すると疑わしいバグを検出します
-  - 11 を入力するとここまでの履歴をJSONで保存します
-※ 文字列を入力すると、過去の履歴を検索するハッシュ値として認識されます`);
+      result = await this.askSocket(`Please enter the index of the detail you want to display:
+- Enter 5 to retry
+- Enter 6 to display the history as a tree structure
+- Enter 7 to generate an exploration report
+- Enter 8 to display the current file
+- Enter 9 to generate a Mermaid diagram of the current function
+- Enter 10 to detect potential bugs
+- Enter 11 to save the history so far as JSON
+※ If you enter a string, it will be interpreted as a hash value to search the past history.`);
       console.log(`result : ${result.ask}`);
       resultNumber = Number(result.ask);
       const newMessages = this.addMessages(`User Enter ${result.ask}`, "user");
@@ -511,13 +506,13 @@ ${functionContent}
     }
     if (!responseJSON[resultNumber]) {
       this.sendErrorSocket(
-        `あなたの選択肢 ${resultNumber} は正しい選択肢ではありません`
+        `Your choice "${resultNumber}" is not valid choice`
       );
       return;
     }
     this.historyHanlder?.addHistory(newHistoryChoices);
     this.saySocket(
-      `Ruby-LSPは "${responseJSON[resultNumber].name}" を検索しています`
+      `Ruby-LSP is searching "${responseJSON[resultNumber].name}"`
     );
     const [searchLine, searchCharacter] =
       await getFileLineAndCharacterFromFunctionName(
@@ -526,21 +521,21 @@ ${functionContent}
         responseJSON[resultNumber].name,
       );
     if (searchLine === -1 && searchCharacter === -1) {
-      this.sendErrorSocket(`ファイルの内容の検索中に失敗しました`);
+      this.sendErrorSocket(`Failed while searching files.`);
       this.saveChoiceTree();
       return;
     }
     const [newFile, newLine, newCharacter, newFunctionContent] =
       await this.queryRubyLsp(currentFilePath, searchLine, searchCharacter);
     if (!newFile) {
-      console.error("Ruby-Lsp はファイルの検索に失敗しました");
-      this.sendErrorSocket("Ruby-Lsp はファイルの検索に失敗しました");
+      console.error("Ruby-Lsp fails to search file.");
+      this.sendErrorSocket("Ruby-Lsp fails to search file.");
       this.saveChoiceTree();
       return;
     }
     this.historyHanlder?.choose(resultNumber, newFunctionContent);
     this.saySocket(
-      `LLMは ${newFile}@${newLine}:${newCharacter} を検索しています`
+      `LLM is searching ${newFile}@${newLine}:${newCharacter}.`
     );
     this.runTask(removeFilePrefixFromFilePath(newFile), newFunctionContent);
   }
@@ -549,7 +544,7 @@ ${functionContent}
     const newRunConfig = this.historyHanlder?.moveById(historyHash);
     if (!newRunConfig) {
       this.sendErrorSocket(
-        `指定された検索履歴のhash値が見つかりませんでした ${historyHash}`
+        `Can not find hash value of selected search history. ${historyHash}`
       );
       this.saveChoiceTree();
       return;
@@ -560,15 +555,15 @@ ${functionContent}
       const [line, character] = await getFileLineAndCharacterFromFunctionName(originalFilePath, functionCodeLine, functionName);
       if (line === -1 && character === -1) {
         this.sendErrorSocket(
-          `指定された検索履歴の関数が見つかりませんでした ${historyHash}`
+          `Can not find function of selected search history. ${historyHash}`
         );
         this.saveChoiceTree();
         return;
       }
       const [newFile, , , newFileContent] = await this.queryRubyLsp(originalFilePath, line, character);
       if (!newFile) {
-        console.error("Ruby-Lsp はファイルの検索に失敗しました");
-        this.sendErrorSocket("Ruby-Lsp はファイルの検索に失敗しました");
+        console.error("Ruby-Lsp fails to search file");
+        this.sendErrorSocket("Ruby-Lsp fails to search file");
         this.saveChoiceTree();
         return;
       }
@@ -580,7 +575,7 @@ ${functionContent}
   private async getReport() {
     const r = this.historyHanlder?.traceFunctionContent();
     if (!r) {
-      this.sendErrorSocket(`レポート取得に失敗しました`);
+      this.sendErrorSocket(`Fail to get report.`);
       return;
     }
     const [result, functionResult] = r;
@@ -623,18 +618,18 @@ ${functionContent}
   }
   private async getBugsReport() {
     const description = await this.askSocket(
-      `読んでいるコードと関連する怪しい挙動があるなら書いてください（無ければnoと書いてください）`
+      `Write any thought about potential bugs.（If you don't have ideas just enter "no"）`
     );
     const r = this.historyHanlder?.traceFunctionContent();
     if (!r) {
-      this.sendErrorSocket(`バグレポート取得に失敗しました...`);
+      this.sendErrorSocket(`Fail to get Bug Report.`);
       return;
     }
     const [result, functionResult] = r;
-    this.saySocket(`"${functionResult}"と関連するバグを探しています`);
+    this.saySocket(`Searching bugs related to "${functionResult}"`);
     const userPrompt = `<functions or methods>
 ${result}
-<the suspicious behavior (optional)>
+<the potential bugs (optional)>
 ${description ? description : "not provided..."}
 `;
     const history: Anthropic.MessageParam[] = [
@@ -663,7 +658,7 @@ ${description ? description : "not provided..."}
       choiceTreeString
     );
     this.saySocket(
-      `ここまでの調査履歴が "${this.saveReportFolder}/${fileName}" に保存されました`
+      `Search history related to "${this.saveReportFolder}/${fileName}" is saved to your local path.`
     );
   }
 

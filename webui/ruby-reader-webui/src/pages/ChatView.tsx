@@ -17,14 +17,14 @@ const INPUT_PHASE_NUMBER = [0, 1, 2, 6];
 const BACK_PHASE_NUMBER = [1, 2, 3, 6, 7];
 const SHOW_HISTORY_NUMBER = [0, 1, 2];
 const INPUT_PHASE_TEXT = [
-  "「検索したいファイルパス」を入力してください", // 0
-  "次は「検索したい関数名の１行」を入力してください", // 1
-  "次は「目的」を入力してください", // 2
-  "タスクを開始する場合は、下の「タスクを開始する」ボタンを押してください", // 3
+  `Enter "file path you want to search"`, // 0
+  `Next, enter "one-line definition of the function to search"`, // 1
+  `Next, enter "Purpose"`, // 2
+  `Enter "Start Task" to start to explore.`, // 3
   "", // 4
   "", // 5
-  "検索を開始する履歴JSONのファイルパスを入力してください", // 6
-  "タスクを開始する場合は、下の「タスクを開始する」ボタンを押してください", // 7
+  "Please enter the file path of the history JSON to start the search.", // 6
+  "Enter "Start Task" to start to explore.", // 7
 ];
 
 const ChatView: React.FC<ChatViewType> = ({
@@ -49,50 +49,50 @@ const ChatView: React.FC<ChatViewType> = ({
   const [historyPath, setHistoryPath] = useState<string>("");
   const task =
     rootPath && rootFunctionName && purpose
-      ? `検索したいファイルパス : ${rootPath}
-検索する関数の１行: ${rootFunctionName}
-目的: ${purpose}`
-      : "タスクは開始されていません";
+      ? `File Path you want to search : ${rootPath}
+One-line definition of the function to search: ${rootFunctionName}
+Purpose: ${purpose}`
+      : "Task is not started";
 
   const lastMessage = messages[messages.length - 1];
   const [inputText, setInputText] = useState<string>("");
   const primaryButtonText =
     inputPhase === 0
-      ? "検索したいファイルパスを入力"
+      ? `Enter "file path you want to search"`
       : inputPhase === 1
-      ? "検索する関数の１行を入力"
+      ? `Enter "One-line definition of the function to search"`
       : inputPhase === 2
-      ? "目的を入力"
+      ? "Enter Purpose"
       : inputPhase === 3
-      ? "タスクを開始する"
+      ? "Start Task"
       : inputPhase === 4
-      ? "選択する"
+      ? "Select"
       : inputPhase === 5
       ? "　"
       : inputPhase === 6
-      ? "入力する履歴のファイルパスを入力"
+      ? `Enter "the file path of the history"`
       : inputPhase === 7
-      ? "タスクを開始する"
-      : "不明なコマンド";
+      ? "Start Task"
+      : "Unknown Command";
 
   const secondaryButtonText =
     inputPhase === 0
       ? "　"
       : inputPhase === 1
-      ? "戻る"
+      ? "Back"
       : inputPhase === 2
-      ? "戻る"
+      ? "Back"
       : inputPhase === 3
-      ? "戻る"
+      ? "Back"
       : inputPhase === 4
-      ? "キャンセルする"
+      ? "Cancel"
       : inputPhase === 5
       ? "　"
       : inputPhase === 6
-      ? "通常入力に戻る"
+      ? "Back to Normal Input"
       : inputPhase === 7
-      ? "戻る"
-      : "不明なコマンド";
+      ? "Back"
+      : "Unknown Command";
 
   const handleSecondaryButtonClick = () => {
     if (BACK_PHASE_NUMBER.includes(inputPhase)) {
@@ -114,12 +114,12 @@ const ChatView: React.FC<ChatViewType> = ({
           {
             type: "say",
             content:
-              "「検索したいファイルパス」と「検索する関数の１行」と「目的」を入力してください",
+              `Please enter the "file path you want to search", the "one-line definition of the function to search," and the "purpose."`,
             time: Date.now(),
           },
           {
             type: "say",
-            content: "「検索したいファイルパス」を入力してください",
+            content: `Enter "file path you want to search"`,
             time: Date.now() + 100,
           },
         ]);
@@ -220,7 +220,7 @@ const ChatView: React.FC<ChatViewType> = ({
       ...m,
       {
         type: "user",
-        content: "履歴から入力",
+        content: "Enter from history Json",
         time: Date.now(),
       },
       {
@@ -273,7 +273,7 @@ const ChatView: React.FC<ChatViewType> = ({
         <p style={{ color: "black", margin: "0" }}>
           {task}
           <hr />
-          まだ設定が完了していなかったら設定を完了させてください
+          If the setup has not been completed yet, please complete the setup.
           <br />
           <VscodeButton
             onClick={() => {
@@ -289,18 +289,18 @@ const ChatView: React.FC<ChatViewType> = ({
                 {
                   type: "say",
                   content:
-                    "「検索したいファイルパス」と「検索する関数の１行」と「目的」を入力してください",
+                    `Please enter the "file path you want to search", the "one-line definition of the function to search", and the "purpose".`,
                   time: Date.now(),
                 },
                 {
                   type: "say",
-                  content: "「検索したいファイルパス」を入力してください",
+                  content: `Enter "file path you want to search"`,
                   time: Date.now() + 100,
                 },
               ]);
             }}
           >
-            設定画面
+            Setting Page
           </VscodeButton>
           <br />
         </p>
@@ -421,7 +421,7 @@ const ChatView: React.FC<ChatViewType> = ({
             onClick={gotoHistoryPhase}
             style={{ width: "330px", margin: "5px 10px" }}
           >
-            検索履歴入力に移動する
+            Move to search using history JSON page. 
           </VscodeButton>
         </div>
       )}
