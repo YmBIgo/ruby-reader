@@ -13,10 +13,9 @@ import {
 
 type SettingViewType = {
   setIsSettingPage: Dispatch<SetStateAction<boolean>>;
-  initClangdPath: string;
+  initRubyLspPath: string;
   initLinuxPath: string;
   initReportPath: string;
-  initCompileCommandPath: string;
   initLlmName: "openai" | "anthropic" | "plamo" | "gemini" | "";
   initOpenAIApiKey: string;
   initAnthropicApiKey: string;
@@ -29,9 +28,8 @@ type SettingViewType = {
 
 const SettingView: React.FC<SettingViewType> = ({
   setIsSettingPage,
-  initClangdPath,
+  initRubyLspPath,
   initLinuxPath,
-  initCompileCommandPath,
   initReportPath,
   initLlmName,
   initOpenAIApiKey,
@@ -42,28 +40,20 @@ const SettingView: React.FC<SettingViewType> = ({
   initAnthropicModelName,
   initGeminiModelName,
 }) => {
-  // clangd
-  const [clangdPath, setClangdPath] = useState<string>("");
-  const updateClangdPath = () => {
+  // rubyLsp
+  const [rubyLspPath, setRubyLspPath] = useState<string>("");
+  const updateRubyLspPath = () => {
     vscode.postMessage({
-      type: "Clangd",
-      text: clangdPath,
+      type: "RubyLsp",
+      text: rubyLspPath,
     });
   };
   // linux path
   const [linuxPath, setLinuxPath] = useState<string>("");
   const updateLinuxPath = () => {
     vscode.postMessage({
-      type: "LinuxPath",
+      type: "RubyProjectPath",
       text: linuxPath,
-    });
-  };
-  // compile commands json path
-  const [compileCommandPath, setCompileCommandPath] = useState<string>("");
-  const updateCompipleCommandPath = () => {
-    vscode.postMessage({
-      type: "CompileCommandPath",
-      text: compileCommandPath,
     });
   };
   // report path
@@ -172,14 +162,11 @@ const SettingView: React.FC<SettingViewType> = ({
   }, []);
 
   useEffect(() => {
-    setClangdPath(initClangdPath);
-  }, [initClangdPath]);
+    setRubyLspPath(initRubyLspPath);
+  }, [initRubyLspPath]);
   useEffect(() => {
     setLinuxPath(initLinuxPath);
   }, [initLinuxPath]);
-  useEffect(() => {
-    setCompileCommandPath(initCompileCommandPath);
-  }, [initCompileCommandPath]);
   useEffect(() => {
     setReportPath(initReportPath);
   }, [initReportPath]);
@@ -220,17 +207,17 @@ const SettingView: React.FC<SettingViewType> = ({
     >
       <h3>設定</h3>
       <hr />
-      <p>Clangd のパス</p>
+      <p>RubyLsp のパス</p>
       <VscodeTextfield
-        value={clangdPath}
+        value={rubyLspPath}
         onChange={(e) =>
-          setClangdPath(
+          setRubyLspPath(
             (e?.target as HTMLTextAreaElement)?.value ?? "error occurs"
           )
         }
       />
       <br />
-      <VscodeButton onClick={updateClangdPath}>Save Clangd Path</VscodeButton>
+      <VscodeButton onClick={updateRubyLspPath}>Save RubyLsp Path</VscodeButton>
       <hr />
       <p>Linux のパス</p>
       <VscodeTextfield
@@ -242,21 +229,7 @@ const SettingView: React.FC<SettingViewType> = ({
         }
       />
       <br />
-      <VscodeButton onClick={updateLinuxPath}>Save Linux Path</VscodeButton>
-      <hr />
-      <p>Compile Commands JSON のパス</p>
-      <VscodeTextfield
-        value={compileCommandPath}
-        onChange={(e) =>
-          setCompileCommandPath(
-            (e?.target as HTMLTextAreaElement)?.value ?? "error occurs"
-          )
-        }
-      />
-      <br />
-      <VscodeButton onClick={updateCompipleCommandPath}>
-        Save Compile Commands JSON Path
-      </VscodeButton>
+      <VscodeButton onClick={updateLinuxPath}>Save Ruby Project Path</VscodeButton>
       <hr />
       <p>レポートを保存する先のパス</p>
       <VscodeTextfield

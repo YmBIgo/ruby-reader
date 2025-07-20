@@ -113,7 +113,7 @@ export class HistoryHandler {
     private move(selectedChoicePosition: ChoicePosition[]) {
         this.currentChoicePosition = selectedChoicePosition;
     }
-    moveById(id: string): ProcessChoice | null {
+    moveById(id: string): Choice | null {
         const searchResult = this.searchTreeById(this.choiceTree, id, 0, 0, []);
         if (!searchResult || !searchResult.pos.length) {
             console.log(`id not found for ${id} ...`);
@@ -122,7 +122,7 @@ export class HistoryHandler {
         this.move(searchResult.pos);
         return searchResult.processChoice;
     }
-    searchTreeById(searchChoiceTree: ChoiceTree, id: string, depth: number, width: number, searchPath: ChoicePosition[]): {pos: ChoicePosition[], processChoice: ProcessChoice} | null {
+    searchTreeById(searchChoiceTree: ChoiceTree, id: string, depth: number, width: number, searchPath: ChoicePosition[]): {pos: ChoicePosition[], processChoice: Choice} | null {
         const newSearchPath = [...searchPath, {depth, width}];
         const isSame = searchChoiceTree.content.id.slice(0, 7) === id;
         if (isSame) {

@@ -16,24 +16,45 @@ export async function getFunctionContentFromLineAndCharacter(
   const fileContentSplit = originalFileContent.split("\n");
   const fileContentStart = fileContentSplit.slice(line);
   const failSafeFileContent = fileContentSplit
-    .slice(line, line + 20)
+    .slice(line, line + 1)
     .join("\n");
-  if (!failSafeFileContent.includes("{")) {
-    return fileContentSplit.slice(line, line + 5).join("\n");
-  }
+  const doIncludeInFailSafeIndex = failSafeFileContent.search(/\sdo[\s]+/)
+  const defIncludeInFailSafeIndex = failSafeFileContent.search(/[\s]+def /);
+  const arrowIncludeInFailSafeIndex = failSafeFileContent.indexOf("{");
+  const failSafeIndex = [
+    doIncludeInFailSafeIndex === -1 ? Infinity : doIncludeInFailSafeIndex,
+    defIncludeInFailSafeIndex === -1 ? Infinity : defIncludeInFailSafeIndex,
+    arrowIncludeInFailSafeIndex === -1 ? Infinity : arrowIncludeInFailSafeIndex
+  ];
+  const failSafeMinValue = Math.min(...failSafeIndex)
+  const startIndex = failSafeMinValue === Infinity
+    ? -1
+    : failSafeIndex.find((i) => i === failSafeMinValue);
+  const startType = failSafeMinValue === Infinity
+    ? " "
+    : startIndex === 0
+      ? "do"
+      : startIndex === 1
+        ? "def"
+        : startIndex === 2
+          ? "\{"
+          : " "
+  const endType = startIndex === 2 ? "\}" : "end"
+  const startRegexp = new RegExp(`[\s]*${escapeRegExp(startType)}[\s\t]*`, "g")
+  const endRegexp = new RegExp(`^[\t ]*${escapeRegExp(endType)}\s*$`, "g")
   let fileResultArray = [];
-  let startArrowCount = 0;
+  let startArrowCount = startType === " " ? 1 : 0;
   let endArrowCount = 0;
   let isLongComment = false;
   for (let row of fileContentStart) {
     fileResultArray.push(row);
-    if (row.replace(/\s\t/g, "").startsWith("//")) {
+    if (row.replace(/\s/g, "").startsWith("#")) {
       continue;
     }
     let commentStartIndex: number = -1;
     let commentEndIndex: number = -1;
-    const longCommentStart = row.matchAll(/\/\*/g);
-    const longCommentEnd = row.matchAll(/\*\//g);
+    const longCommentStart = row.matchAll(/=begin/g);
+    const longCommentEnd = row.matchAll(/=end/g);
     for (const start_m of longCommentStart) {
       commentStartIndex = start_m.index;
       // 最初で破棄
@@ -58,16 +79,38 @@ export async function getFunctionContentFromLineAndCharacter(
     if (isLongComment) {
       continue;
     }
-    startArrowCount += row.match(/\{/g)?.length ?? 0;
-    endArrowCount += row.match(/\}/g)?.length ?? 0;
+    if (startType === "\{") {
+      startArrowCount += row.match(startRegexp)?.length ?? 0;
+    } else {
+      startArrowCount += row.match(/\s+do\s*/g)?.length ?? 0;
+      startArrowCount += row.match(/^\s*def\s/g)?.length ?? 0;
+      const ifExistsCount = row.match(/^\s*if\s/g)?.length ?? 0;
+      const untilExistsCount = row.match(/^\s*until\s/g)?.length ?? 0;
+      const unlessExistsCount = row.match(/^\s*unless\s/g)?.length ?? 0;
+      const whileExistsCount = row.match(/^\s*while\s/g)?.length ?? 0
+      const lambdaExistsCount = row.match(/^\s*lambda\s/g)?.length ?? 0;
+      if (ifExistsCount > 0 || whileExistsCount > 0 || untilExistsCount > 0 || unlessExistsCount > 0 || lambdaExistsCount > 0) {
+        const isReturnExists = row.match(/[\s]*return/g);
+        const isQuestionExists = row.match(/\?/g);
+        if (!isReturnExists && !isQuestionExists) {
+          startArrowCount += ifExistsCount;
+          startArrowCount += whileExistsCount;
+          startArrowCount += untilExistsCount;
+          startArrowCount += unlessExistsCount;
+          startArrowCount += lambdaExistsCount;
+        }
+      }
+    }
+    endArrowCount += row.match(endRegexp)?.length ?? 0;
     if (
       startArrowCount === endArrowCount &&
       startArrowCount + endArrowCount !== 0
     ) {
+      console.log(startArrowCount, endArrowCount)
       return fileResultArray.join("\n");
     }
   }
-  console.error("error", startArrowCount, endArrowCount);
+  console.error("error", startArrowCount, endArrowCount, fileResultArray.length);
   return "";
 }
 
@@ -84,30 +127,27 @@ export async function getFileLineAndCharacterFromFunctionName(
     console.error(e);
     return [-1, -1];
   }
-  const memberAccessFunction = functionName.split("->");
-  const memberAccessFunctionName =
-    memberAccessFunction[memberAccessFunction.length - 1];
-  const wholeFunctionName = !memberAccessFunctionName.includes("(") && memberAccessFunction.length === 1
-    ? memberAccessFunctionName + "("
-    : memberAccessFunction.length > 1
-    ? memberAccessFunctionName + ")"
-    : memberAccessFunctionName;
-  const simplfiedFunctionName = isFirst || memberAccessFunction.length > 1
-    ? [wholeFunctionName.split(",")[0].replace(/^[\s\t]*/g, "")]
-    : [" " + wholeFunctionName.split(",")[0].replace(/^[\s\t]*/g, ""),
-      "\t" + wholeFunctionName.split(",")[0].replace(/^[\s\t]*/g, "")];
+  const codeLineRegexp = new RegExp(`\\s${escapeRegExp(codeLine)}[\\s\\(\\)\\{\\|]{1}`, "g");
+  const functionNameRegexp = new RegExp(`(::|\\.|\\s)${escapeRegExp(functionName)}[\\s\\(\\)\\{\\|]{1}`, "g");
+  const defClassFunctionRegexp = new RegExp(`\\s(def|class)\\s+${escapeRegExp(functionName)}`, "g");
+  const memberAccessFunction = functionName.split("::");
+  const memberAccessFunctionName = "::" + memberAccessFunction[memberAccessFunction.length - 1];
+  const memberAccessFunctionRegexp = new RegExp(`${escapeRegExp(memberAccessFunctionName)}\\s*[\\(\\)\\{]*`, "g")
+  const dotAccessFunction = functionName.split(".");
+  const dotAccessFunctionName = "." + dotAccessFunction[dotAccessFunction.length - 1];
+  const dotAccessFunctionRegexp = new RegExp(`${escapeRegExp(dotAccessFunctionName)}\\s*[\\(\\)\\{]*`, "g");
   const fileContentArray = fileContent.split("\n");
   let isLongComment = false;
   for (let i in fileContentArray) {
     const index = isNaN(Number(i)) ? -1 : Number(i);
-    const row = fileContentArray[index];
-    if (row.replace(/\s\t/g, "").startsWith("//")) {
+    const row = "\n" + fileContentArray[index] + "\n";
+    if (row.replace(/\s/g, "").startsWith("#")) {
       continue;
     }
     let commentStartIndex: number = -1;
     let commentEndIndex: number = -1;
-    const longCommentStart = row.matchAll(/\/\*/g);
-    const longCommentEnd = row.matchAll(/\*\//g);
+    const longCommentStart = row.matchAll(/=begin/g);
+    const longCommentEnd = row.matchAll(/=end/g);
     for (const start_m of longCommentStart) {
       commentStartIndex = start_m.index;
       // 最初で破棄
@@ -132,19 +172,28 @@ export async function getFileLineAndCharacterFromFunctionName(
     if (isLongComment) {
       continue;
     }
-    let functionIndex = row.indexOf(simplfiedFunctionName[0]);
-    if (!isFirst && functionIndex >= 0) {
-      functionIndex += 1;
-    }
-    if (functionIndex === -1 && simplfiedFunctionName.length === 2) {
-      functionIndex = row.indexOf(simplfiedFunctionName[1]);
-      if (!isFirst && functionIndex >= 0) {
-        functionIndex += 1;
+    if (!isFirst) {
+      const defOrClassMatched = row.search(defClassFunctionRegexp);
+      if (defOrClassMatched !== -1) {
+        console.log("def class found...");
+        continue;
       }
     }
-    if (functionIndex >= 0) {
+    let functionIndex = row.search(codeLineRegexp);
+    if (memberAccessFunction.length > 1 && functionIndex !== -1) {
+      functionIndex = row.search(memberAccessFunctionRegexp)
+    } else if (dotAccessFunction.length > 1 && functionIndex !== -1) {
+      functionIndex = row.search(dotAccessFunctionRegexp)
+    } else if (functionIndex !== -1) {
+      functionIndex = row.search(functionNameRegexp);
+    }
+    if (functionIndex !== -1) {
       return [index, functionIndex];
     }
   }
   return [-1, -1];
+}
+
+function escapeRegExp(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

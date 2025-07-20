@@ -1,7 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import { LinuxLLMReaderProvider } from './core/provider';
+import { RubyLLMReaderProvider } from './core/provider';
 
 let outputChannel: vscode.OutputChannel;
 
@@ -11,17 +11,17 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "linux-reader" is now active!');
+	console.log('Congratulations, your extension "ruby-reader" is now active!');
 
-	outputChannel = vscode.window.createOutputChannel("linux-reader");
+	outputChannel = vscode.window.createOutputChannel("ruby-reader");
 	context.subscriptions.push(outputChannel);
 
-	const tabProvider = new LinuxLLMReaderProvider(context);
+	const tabProvider = new RubyLLMReaderProvider(context);
 
-	const openLinuxReaderInNewTab = () => {
+	const openRubyReaderInNewTab = () => {
 		const lastCol = Math.max(...vscode.window.visibleTextEditors.map((editor) => editor.viewColumn || 0));
 		const targetCol = Math.max(lastCol + 1, 1);
-		const panel = vscode.window.createWebviewPanel(LinuxLLMReaderProvider.viewType, "linux-reader", targetCol, {
+		const panel = vscode.window.createWebviewPanel(RubyLLMReaderProvider.viewType, "ruby-reader", targetCol, {
 			enableScripts: true,
 			retainContextWhenHidden: true,
 			localResourceRoots: [context.extensionUri],
@@ -34,15 +34,15 @@ export function activate(context: vscode.ExtensionContext) {
 		});
 	};
 
-	context.subscriptions.push(vscode.commands.registerCommand("linux-reader.openInNewTab", openLinuxReaderInNewTab));
+	context.subscriptions.push(vscode.commands.registerCommand("ruby-reader.openInNewTab", openRubyReaderInNewTab));
 
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('linux-reader.helloWorld', () => {
+	const disposable = vscode.commands.registerCommand('ruby-reader.helloWorld', () => {
 		// The code you place here will be executed every time your command is executed
 		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from linux-reader!');
+		vscode.window.showInformationMessage('Hello World from ruby-reader!');
 	});
 
 	context.subscriptions.push(disposable);

@@ -1,25 +1,25 @@
 import * as vscode from "vscode";
 import fs from "fs/promises";
 
-import { LinuxReader } from "./assistant";
+import { RubyReader } from "./assistant";
 import { Message } from "./type/Message";
 import { AskResponse } from "./type/Response";
 import pWaitFor from "p-wait-for";
 import { LLMName } from "./llm";
 
 let view: vscode.WebviewView | vscode.WebviewPanel;
-let linuxReaderAssitant: LinuxReader | null;
+let rubyReaderAssitant: RubyReader | null;
 
-export class LinuxLLMReaderProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = "linux-reader.SlidebarProvider";
+export class RubyLLMReaderProvider implements vscode.WebviewViewProvider {
+  public static readonly viewType = "ruby-reader.SlidebarProvider";
   private disposables: vscode.Disposable[] = [];
   private allowedMessageType = [
     "Init",
     "InitHistory",
     "Reset",
     "Ask",
-    "Clangd",
-    "LinuxPath",
+    "RubyLsp",
+    "RubyProjectPath",
     "CompileCommandPath",
     "ReportPath",
     "LLMName",
@@ -36,8 +36,8 @@ export class LinuxLLMReaderProvider implements vscode.WebviewViewProvider {
   constructor(private readonly context: vscode.ExtensionContext) {}
 
   async init() {
-    await linuxReaderAssitant?.doGC();
-    linuxReaderAssitant = new LinuxReader(
+    await rubyReaderAssitant?.doGC();
+    rubyReaderAssitant = new RubyReader(
       this.ask,
       this.say,
       this.sendError,
@@ -55,11 +55,10 @@ export class LinuxLLMReaderProvider implements vscode.WebviewViewProvider {
       // gemini
       ((await this.getGlobalState("GeminiModel")) as string) ?? "",
       ((await this.getSecret("GeminiApiKey")) as string) ?? "",
-      // clangd
-      ((await this.getGlobalState("clangdPath")) as string) ??
-        "/usr/bin/clangd",
-      ((await this.getGlobalState("linuxPath")) as string) ?? "",
-      ((await this.getGlobalState("compileCommand")) as string) ?? "",
+      // ruby-lsp
+      ((await this.getGlobalState("rubyLspPath")) as string) ??
+        "/opt/homebrew/bin/ruby-lsp", // for mac brew
+      ((await this.getGlobalState("rubyProjectPath")) as string) ?? "",
       ((await this.getGlobalState("report")) as string) ?? "~/Desktop"
     );
   }
@@ -85,7 +84,7 @@ export class LinuxLLMReaderProvider implements vscode.WebviewViewProvider {
   }
 
   async ask(content: string): Promise<AskResponse> {
-    linuxReaderAssitant?.clearWebViewAskResponse();
+    rubyReaderAssitant?.clearWebViewAskResponse();
     const askContentJson = JSON.stringify({
       type: "ask",
       ask: content,
@@ -93,12 +92,12 @@ export class LinuxLLMReaderProvider implements vscode.WebviewViewProvider {
     view?.webview.postMessage(askContentJson);
     await pWaitFor(
       () => {
-        return !!linuxReaderAssitant?.getWebViewAskResponse();
+        return !!rubyReaderAssitant?.getWebViewAskResponse();
       },
       { interval: 500 }
     );
     const response: AskResponse = {
-      ask: linuxReaderAssitant?.getWebViewAskResponse() ?? "unknown error",
+      ask: rubyReaderAssitant?.getWebViewAskResponse() ?? "unknown error",
     };
     console.log("response : ", response);
     return response;
@@ -158,7 +157,7 @@ export class LinuxLLMReaderProvider implements vscode.WebviewViewProvider {
           const rootFunctionName = message.rootFunctionName ?? "";
           const purpose = message.purpose ?? "";
           console.log("Task Start", rootPath, purpose);
-          linuxReaderAssitant?.runFirstTask(
+          rubyReaderAssitant?.runFirstTask(
             rootPath,
             rootFunctionName,
             purpose
@@ -177,7 +176,7 @@ export class LinuxLLMReaderProvider implements vscode.WebviewViewProvider {
             };
             // 残るのは choiceTree
             console.log("History Task Start", rootPath, purpose);
-            linuxReaderAssitant?.runFirstTaskWithHistory(
+            rubyReaderAssitant?.runFirstTaskWithHistory(
               rootPath,
               rootFunctionName,
               purpose,
@@ -188,9 +187,9 @@ export class LinuxLLMReaderProvider implements vscode.WebviewViewProvider {
           }
           break;
         case "Reset":
-          linuxReaderAssitant?.doGC();
-          linuxReaderAssitant = null;
-          linuxReaderAssitant = new LinuxReader(
+          rubyReaderAssitant?.doGC();
+          rubyReaderAssitant = null;
+          rubyReaderAssitant = new RubyReader(
             this.ask,
             this.say,
             this.sendError,
@@ -208,27 +207,26 @@ export class LinuxLLMReaderProvider implements vscode.WebviewViewProvider {
             // gemini
             ((await this.getGlobalState("GeminiModel")) as string) ?? "",
             ((await this.getSecret("GeminiApiKey")) as string) ?? "",
-            // clangd
-            ((await this.getGlobalState("clangdPath")) as string) ??
-              "/usr/bin/clangd",
-            ((await this.getGlobalState("linuxPath")) as string) ?? "",
-            ((await this.getGlobalState("compileCommand")) as string) ?? "",
+            // ruby-lsp
+            ((await this.getGlobalState("rubyLspPath")) as string) ??
+              "/opt/homebrew/bin/ruby-lsp",
+            ((await this.getGlobalState("rubyProjectPath")) as string) ?? "",
             ((await this.getGlobalState("report")) as string) ?? "~/Desktop"
           );
           break;
         case "Ask":
           const askResponse = message.askResponse;
           console.log("receive message", askResponse);
-          linuxReaderAssitant?.handleWebViewAskResponse(askResponse);
+          rubyReaderAssitant?.handleWebViewAskResponse(askResponse);
           break;
-        case "Clangd":
-          const clangdPath = message.text;
-          this.updateGlobalState("clangdPath", clangdPath);
+        case "RubyLsp":
+          const rubyLspPath = message.text;
+          this.updateGlobalState("rubyLspPath", rubyLspPath);
           this.init();
           break;
-        case "LinuxPath":
-          const linuxPath = message.text;
-          this.updateGlobalState("linuxPath", linuxPath);
+        case "RubyProjectPath":
+          const rubyProjectPath = message.text;
+          this.updateGlobalState("rubyProjectPath", rubyProjectPath);
           this.init();
           break;
         case "CompileCommandPath":
@@ -310,12 +308,12 @@ export class LinuxLLMReaderProvider implements vscode.WebviewViewProvider {
       ((await this.getGlobalState("GeminiModel")) as string) ??
       "gemini-2.0-flash";
     const geminiApi = ((await this.getSecret("GeminiApiKey")) as string) ?? "";
-    // clangd
-    const clangd =
-      ((await this.getGlobalState("clangdPath")) as string) ??
-      "/usr/bin/clangd";
-    const linuxPath =
-      ((await this.getGlobalState("linuxPath")) as string) ?? "";
+    // ruby-lsp
+    const rubyLspPath =
+      ((await this.getGlobalState("rubyLspPath")) as string) ??
+      "/opt/homebrew/bin/ruby-lsp";
+    const rubyProjectPath =
+      ((await this.getGlobalState("rubyProjectPath")) as string) ?? "";
     const compileCommand =
       ((await this.getGlobalState("compileCommand")) as string) ?? "";
     const report =
@@ -323,8 +321,8 @@ export class LinuxLLMReaderProvider implements vscode.WebviewViewProvider {
     view.webview.postMessage(
       JSON.stringify({
         type: "init",
-        clangd,
-        linuxPath,
+        rubyLspPath,
+        rubyProjectPath,
         compileCommand,
         report,
         llmName,
@@ -350,7 +348,7 @@ export class LinuxLLMReaderProvider implements vscode.WebviewViewProvider {
     // The JS file from the React build output
     const scriptUri = getUri(webview, this.context.extensionUri, [
       "webui",
-      "linux-reader-webui",
+      "ruby-reader-webui",
       "dist",
       "assets",
       "main.js",
@@ -367,7 +365,7 @@ export class LinuxLLMReaderProvider implements vscode.WebviewViewProvider {
     <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
     <meta name="theme-color" content="#000000">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}';">
-    <title>Linux Reader</title>
+    <title>Ruby Reader</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
@@ -396,76 +394,6 @@ export class LinuxLLMReaderProvider implements vscode.WebviewViewProvider {
 
   private async getSecret(key: string) {
     return await this.context.secrets.get(key);
-  }
-
-  private getSimpleHTMLContent(): string {
-    return `
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
-    <meta name="theme-color" content="#000000">
-    <title>Linux Reader Simple</title>
-  </head>
-  <body>
-    <div id="root">
-      <h3>Linux Reader Simple</h3>
-      <p>Please Input linux file path you want to search from</p>
-      <input type="text" id="linux_file_path"/>
-      <br/>
-      <p>Please Input position in above file</p>
-      <input type="text" id="linux_function_name">
-      <br/>
-      <input type="submit" onClick="submitLinuxInfo()"/>
-      <hr/>
-      <p id="linux_result_file"></p>
-      <p id="linux_result_line_and_character"></p>
-      <p id="linux_result"></p>
-    </div>
-  </body>
-  <script>
-    const vscode = acquireVsCodeApi();
-    function submitLinuxInfo() {
-        const filePath = document.getElementById("linux_file_path")?.value;
-        const functionName = document.getElementById("linux_function_name")?.value;
-        if (!filePath || !functionName) {
-          console.log("dom not found 0")
-          return;
-        }
-        vscode.postMessage({
-            type: "textDocument/definition",
-            filePath,
-            functionName
-        });
-    }
-    window.addEventListener("message", (e) => {
-        const resultFileDOM = document.getElementById("linux_result_file");
-        const resultLineAndCharacterDOM = document.getElementById("linux_result_line_and_character");
-        const resultDOM = document.getElementById("linux_result");
-        if (!resultFileDOM || !resultLineAndCharacterDOM) {
-          console.log("dom not found1")
-          return;
-        }
-        const originalMessage = typeof e === "string" ? e.data : e.data.toString();
-        let parsedMessage = {}
-        try {
-            if (typeof originalMessage === "string") parsedMessage = JSON.parse(originalMessage);
-            else if (typeof originalMessage === "object") parsedMessage = originalMessage;
-            else parsedMessage =JSON.parse(originalMessage);
-        } catch (e) {
-            console.error(e);
-        }
-        const file = parsedMessage?.file ?? "unknown";
-        const line_and_character = parsedMessage?.line_and_character ?? "unknown";
-        const results = parsedMessage?.result;
-        resultFileDOM.innerText = file
-        resultLineAndCharacterDOM.innerText = line_and_character
-        resultDOM.innerText = results;
-    })
-  </script>
-</html>
-`;
   }
 }
 

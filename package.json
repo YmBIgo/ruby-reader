@@ -1,7 +1,7 @@
 {
-  "name": "linux-reader",
-  "displayName": "linux-reader",
-  "description": " Linux のソースコードをLLMと一緒に効率的に読むための VSCode 拡張",
+  "name": "ruby-reader",
+  "displayName": "ruby-reader",
+  "description": " Ruby のソースコードをLLMと一緒に効率的に読むための VSCode 拡張",
   "version": "1.0.3",
   "type": "commonjs",
   "icon": "logo.png",
@@ -15,25 +15,34 @@
   "publisher": "coffeecupjapan",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YmBIgo/LinuxReader"
+    "url": "https://github.com/YmBIgo/RubyReader"
   },
   "categories": [
     "Other"
   ],
   "activationEvents": [
-    "onCommand:linux-reader.helloWorld",
-    "onCommand:linux-reader.openInNewTab"
+    "onCommand:ruby-reader.helloWorld",
+    "onCommand:ruby-reader.openInNewTab"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "linux-reader.helloWorld",
+        "command": "ruby-reader.helloWorld",
         "title": "Hello World"
       },
       {
-        "command": "linux-reader.openInNewTab",
-        "title": "Open Linux Tab"
+        "command": "ruby-reader.openInNewTab",
+        "title": "Open Ruby Reader Tab"
+      }
+    ],
+    "languages": [
+      {
+        "id": "ruby",
+        "aliases": ["Ruby"],
+        "extensions": [
+          ".rb"
+        ]
       }
     ]
   },

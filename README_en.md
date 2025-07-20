@@ -1,6 +1,6 @@
-# linux-reader README
+# ruby-reader README
 
-This is the README for your extension "linux-reader". After writing up a brief description, we recommend including the following sections.
+This is the README for your extension "ruby-reader". After writing up a brief description, we recommend including the following sections.
 
 ## Features
 

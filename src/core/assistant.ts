@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 import * as vscodelc from "vscode-languageclient/node";
+import * as cp from "child_process";
+import * as util from "util";
 import fs from "fs/promises";
 
 import {
@@ -20,12 +22,15 @@ import {
   bugFixPrompt,
   mermaidPrompt,
   pickCandidatePromopt,
+  reportPromopt,
 } from "./prompt/index_ja";
 import pWaitFor from "p-wait-for";
 
-let client: ClangdLanguageClient | null;
+let client: RubyLanguageClient | null;
 
-class ClangdLanguageClient extends vscodelc.LanguageClient {
+const exec = util.promisify(cp.exec);
+
+class RubyLanguageClient extends vscodelc.LanguageClient {
   // Override the default implementation for failed requests. The default
   // behavior is just to log failures in the output panel, however output panel
   // is designed for extension debugging purpose, normal users will not open it,
@@ -50,9 +55,9 @@ class ClangdLanguageClient extends vscodelc.LanguageClient {
   }
 }
 
-export const clangdDocumentSelector = [{ scheme: "file", language: "c" }];
+export const rubyLspocumentSelector = [{ scheme: "file", language: "ruby" }];
 
-export class LinuxReader {
+export class RubyReader {
   private apiHandler: LLMModel | null;
   private historyHanlder: HistoryHandler | null = null;
   private rootPath: string = "";
@@ -88,10 +93,9 @@ export class LinuxReader {
     // gemini
     geminiModel: string,
     geminiApiKey: string,
-    // clangd
-    clangdPath: string,
-    linuxPath: string,
-    compileCommandPath: string,
+    // ruby-lsp
+    rubyLspPath: string,
+    rubyProjectPath: string,
     reportPath: string
   ) {
     this.saySocket = (content: string) => {
@@ -134,30 +138,29 @@ export class LinuxReader {
         : "unknown llm name";
     this.apiHandler = buildLLMHanlder(llmName, modelType, apiKey);
     this.saveReportFolder = reportPath;
-    if (!clangdPath || !linuxPath || !compileCommandPath) {
+    if (!rubyLspPath || !rubyProjectPath) {
       return;
     }
-    this.init(clangdPath, linuxPath, compileCommandPath);
+    this.init(rubyLspPath, rubyProjectPath);
   }
 
   private async init(
-    clangdPath: string,
-    linuxPath: string,
-    compileCommand: string
+    rubyLspPath: string,
+    rubyProjectPath: string,
   ) {
-    const clangd: vscodelc.Executable = {
-      command: clangdPath,
-      args: [`--compile-commands-dir=${compileCommand}`, "--background-index"],
+    const rubyLsp: vscodelc.Executable = {
+      command: rubyLspPath,
       options: {
-        cwd: linuxPath,
-        shell: true,
+        cwd: rubyProjectPath,
       },
     };
-    const serverOptions: vscodelc.ServerOptions = clangd;
+    const serverOptions: vscodelc.ServerOptions = rubyLsp;
     const clientOptions: vscodelc.LanguageClientOptions = {
-      documentSelector: clangdDocumentSelector,
+      documentSelector: rubyLspocumentSelector,
       initializationOptions: {
-        clangdFileStatus: true,
+        enabledFeatures: {
+          fileStatus: true
+        },
       },
       revealOutputChannelOn: vscodelc.RevealOutputChannelOn.Never,
     };
@@ -168,11 +171,11 @@ export class LinuxReader {
           console.log("client restarting");
         })
         .catch(() => {
-          console.error("client failed to start...");
+          console.error("client failed to restart...");
         });
     } else {
-      client = new ClangdLanguageClient(
-        `Linux Reader`,
+      client = new RubyLanguageClient(
+        `Ruby Reader`,
         serverOptions,
         clientOptions
       );
@@ -201,7 +204,7 @@ export class LinuxReader {
         currentFilePath,
         currentFunctionName,
         currentFunctionName,
-        true
+        true,
       );
     if (currentLine === -1 && currentCharacter === -1) {
       this.sendErrorSocket(
@@ -225,7 +228,7 @@ export class LinuxReader {
     const result = await this.askSocket(question);
     const resultNumber = parseInt(result.ask);
     if (isNaN(resultNumber) || resultNumber > 999999) {
-      this.runHistoryPoint(result.ask);
+      await this.runHistoryPoint(result.ask);
       return;
     }
     this.sendErrorSocket("ハッシュ値が見つかりませんでした。再度閉じて再試行してください");
@@ -243,7 +246,7 @@ export class LinuxReader {
         currentFilePath,
         currentFunctionName,
         currentFunctionName,
-        true
+        true,
       );
     if (currentLine === -1 && currentCharacter === -1) {
       this.sendErrorSocket(
@@ -327,6 +330,7 @@ ${functionContent}
       let isLongComment2 = false;
       const fileCodeLine =
         fileContentArray.find((fcr) => {
+          if (!fcr) return false
           if (fcr.includes(each_r.code_line)) {
             return true;
           }
@@ -498,7 +502,7 @@ ${functionContent}
       }
     }
     if (isNaN(resultNumber) || resultNumber > 999999) {
-      this.runHistoryPoint(result.ask);
+      await this.runHistoryPoint(result.ask);
       return;
     }
     if (resultNumber === 5) {
@@ -513,14 +517,13 @@ ${functionContent}
     }
     this.historyHanlder?.addHistory(newHistoryChoices);
     this.saySocket(
-      `Clangdは "${responseJSON[resultNumber].name}" を検索しています`
+      `Ruby-LSPは "${responseJSON[resultNumber].name}" を検索しています`
     );
     const [searchLine, searchCharacter] =
       await getFileLineAndCharacterFromFunctionName(
         currentFilePath,
         responseJSON[resultNumber].code_line,
         responseJSON[resultNumber].name,
-        false
       );
     if (searchLine === -1 && searchCharacter === -1) {
       this.sendErrorSocket(`ファイルの内容の検索中に失敗しました`);
@@ -528,10 +531,10 @@ ${functionContent}
       return;
     }
     const [newFile, newLine, newCharacter, newFunctionContent] =
-      await this.queryClangd(currentFilePath, searchLine, searchCharacter);
+      await this.queryRubyLsp(currentFilePath, searchLine, searchCharacter);
     if (!newFile) {
-      console.error("Clangd はファイルの検索に失敗しました");
-      this.sendErrorSocket("Clangd はファイルの検索に失敗しました");
+      console.error("Ruby-Lsp はファイルの検索に失敗しました");
+      this.sendErrorSocket("Ruby-Lsp はファイルの検索に失敗しました");
       this.saveChoiceTree();
       return;
     }
@@ -542,7 +545,7 @@ ${functionContent}
     this.runTask(removeFilePrefixFromFilePath(newFile), newFunctionContent);
   }
 
-  private runHistoryPoint(historyHash: string) {
+  private async runHistoryPoint(historyHash: string) {
     const newRunConfig = this.historyHanlder?.moveById(historyHash);
     if (!newRunConfig) {
       this.sendErrorSocket(
@@ -551,8 +554,27 @@ ${functionContent}
       this.saveChoiceTree();
       return;
     }
-    const { functionCodeLine, originalFilePath } = newRunConfig;
-    this.runTask(originalFilePath, functionCodeLine);
+    const { functionCodeContent, functionCodeLine, functionName, originalFilePath } = newRunConfig;
+    let functionResult = functionCodeContent;
+    if (!functionCodeContent) {
+      const [line, character] = await getFileLineAndCharacterFromFunctionName(originalFilePath, functionCodeLine, functionName);
+      if (line === -1 && character === -1) {
+        this.sendErrorSocket(
+          `指定された検索履歴の関数が見つかりませんでした ${historyHash}`
+        );
+        this.saveChoiceTree();
+        return;
+      }
+      const [newFile, , , newFileContent] = await this.queryRubyLsp(originalFilePath, line, character);
+      if (!newFile) {
+        console.error("Ruby-Lsp はファイルの検索に失敗しました");
+        this.sendErrorSocket("Ruby-Lsp はファイルの検索に失敗しました");
+        this.saveChoiceTree();
+        return;
+      }
+      functionResult = newFileContent;
+    }
+    this.runTask(originalFilePath, functionResult ?? functionCodeLine);
   }
 
   private async getReport() {
@@ -573,7 +595,7 @@ ${result}`;
     ];
     const response =
       (await this.apiHandler?.createMessage(
-        pickCandidatePromopt,
+        reportPromopt,
         history,
         false
       )) || "failed to get result";
@@ -645,7 +667,7 @@ ${description ? description : "not provided..."}
     );
   }
 
-  private async doQueryClangd(
+  private async doQueryRubyLsp(
     filePath: string,
     line: number,
     character: number,
@@ -654,13 +676,13 @@ ${description ? description : "not provided..."}
     console.log(line, character);
     let itemString: string = "";
     const fileContent = await fs.readFile(filePath, "utf-8");
-    await pWaitFor(() => !!this.isClangdRunning(), {
+    await pWaitFor(() => !!this.isRubyLspRunning(), {
       interval: 500,
     });
     await client?.sendNotification("textDocument/didOpen", {
       textDocument: {
         uri: addFilePrefixToFilePath(filePath),
-        languageId: "c",
+        languageId: "ruby",
         version: 0,
         text: fileContent,
       },
@@ -676,6 +698,7 @@ ${description ? description : "not provided..."}
         position: { line, character },
       })
       .then((result) => {
+        console.log("definition result : ", result)
         itemString = JSON.stringify(result);
       });
     let item: any = [];
@@ -690,47 +713,35 @@ ${description ? description : "not provided..."}
       return ["", 0, 0, item];
     }
     const firstItem = item[0];
-    const file = firstItem.uri;
+    const file = firstItem.targetUri;
     await client?.sendNotification("textDocument/didClose", {
       textDocument: {
         uri: addFilePrefixToFilePath(filePath),
-        languageId: "c",
+        languageId: "ruby",
         version: 0,
         text: fileContent,
       },
     });
     return [
       file,
-      firstItem.range.start.line,
-      firstItem.range.start.character,
+      firstItem.targetRange.start.line,
+      firstItem.targetRange.start.character,
       item,
     ];
   }
 
-  async queryClangd(
+  async queryRubyLsp(
     filePath: string,
     line: number,
     character: number
   ): Promise<[string, number, number, string, any]> {
     const [newFilePath1, newLine1, newCharacter1, item1] =
-      await this.doQueryClangd(filePath, line, character, 5000);
+      await this.doQueryRubyLsp(filePath, line, character, 5000);
     let newFilePath2 = newFilePath1;
     let newLine2 = newLine1;
     let newCharacter2 = newCharacter1;
     let item2 = item1;
 
-    for (let i = 0; i < 10; i++) {
-      if (newFilePath2.endsWith(".h")) {
-        [newFilePath2, newLine2, newCharacter2, item2] =
-          await this.doQueryClangd(
-            removeFilePrefixFromFilePath(newFilePath1),
-            newLine1,
-            newCharacter1
-          );
-      } else if (newFilePath2.endsWith(".c")) {
-        break;
-      }
-    }
     const functionContent = await getFunctionContentFromLineAndCharacter(
       removeFilePrefixFromFilePath(newFilePath2),
       newLine2,
@@ -739,7 +750,7 @@ ${description ? description : "not provided..."}
     return [newFilePath2, newLine2, newCharacter2, functionContent, item2];
   }
 
-  private isClangdRunning() {
+  private isRubyLspRunning() {
     return client?.state === vscodelc.State.Running;
   }
 
