@@ -1,7 +1,7 @@
 {
   "name": "ruby-reader",
   "displayName": "ruby-reader",
-  "description": " Ruby のソースコードをLLMと一緒に効率的に読むための VSCode 拡張",
+  "description": "LLM tool which aim to read large ruby codebase",
   "version": "1.0.3",
   "type": "commonjs",
   "icon": "logo.png",
