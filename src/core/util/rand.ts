@@ -1,4 +1,4 @@
-const hexSeed = "0123456789abcdef";
+export const hexSeed = "0123456789abcdef";
 
 export function generateHexString() {
     let result = "";

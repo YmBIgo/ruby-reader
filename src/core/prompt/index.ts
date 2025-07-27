@@ -11,7 +11,7 @@ CAPABILITIES
 RULES
 
 - The user provides you with a "Purpose of reading the Ruby code" and the "Content of the current function being viewed.". You respond in JSON format with 1 to 5 items, each including:  
-  1. "function_name": the name of the relevant function
+  1. "name": the name of the relevant function
   2. "code_line": one line that includes the function (e.g., the definition)
   3. "description": a brief explanation of what the function does and why it's relevant
   4. "score": a self-assigned relevance score out of 100 based on how well the function matches the given purpose
@@ -93,6 +93,37 @@ I want to understand the logic responsible for performing searches within GitLab
 - Do not include any comments outside of the JSON.
 - Respond using a valid JSON format.
 - Limit the response to a maximum of 5 items.
+- Don't select method name as candidate (See example below).
+
+[Bad Example]
+
+\`\`\`Code
+      def resolve
+        start_resolution
+
+        while state
+          break if !state.requirement && state.requirements.empty?
+          indicate_progress
+          if state.respond_to?(:pop_possibility_state) # DependencyState
+            debug(depth) { "Creating possibility state for #{requirement} (#{possibilities.count} remaining)" }
+            state.pop_possibility_state.tap do |s|
+              if s
+                states.push(s)
+                activated.tag(s)
+              end
+            end
+          end
+          process_topmost_state
+        end
+
+        resolve_activated_specs
+      ensure
+        end_resolution
+      end
+\`\`\`
+
+-> you should not include \`resolve\` as candiate
+
 `;
 
 export const reportPromopt = `You are the "Ruby Code Reading Assistant," an exceptionally skilled software developer with expertise in numerous programming languages, frameworks, design patterns, and best practices.

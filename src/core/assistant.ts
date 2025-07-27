@@ -23,6 +23,7 @@ import {
   reportPromopt,
 } from "./prompt/index";
 import pWaitFor from "p-wait-for";
+import { is7wordString } from "./util/number";
 
 let client: RubyLanguageClient | null;
 
@@ -207,13 +208,15 @@ export class RubyReader {
         `Can not find content below. ${currentFunctionName} @ ${currentFilePath}...`
       );
     }
+    const functionCodeContent = await getFunctionContentFromLineAndCharacter(currentFilePath, currentLine, currentCharacter);
     this.rootLine = currentLine;
     this.rootCharacter = currentCharacter;
     this.purpose = purpose;
     this.historyHanlder = new HistoryHandler(
       this.rootPath,
       currentFunctionName,
-      currentFunctionName
+      currentFunctionName,
+      functionCodeContent
     );
     this.historyHanlder.overWriteChoiceTree(choiceTree);
     const historyTree = this.historyHanlder.showHistory();
@@ -222,8 +225,7 @@ export class RubyReader {
     }
     const question = "Input hash value of past history which you want to search from.";
     const result = await this.askSocket(question);
-    const resultNumber = parseInt(result.ask);
-    if (isNaN(resultNumber) || resultNumber > 999999) {
+    if (is7wordString(result.ask)) {
       await this.runHistoryPoint(result.ask);
       return;
     }
@@ -249,13 +251,19 @@ export class RubyReader {
         `Can not find content of ${currentFunctionName} @ ${currentFilePath}...`
       );
     }
+    const functionCodeContent = await getFunctionContentFromLineAndCharacter(
+      currentFilePath,
+      currentLine,
+      currentCharacter
+    );
     this.rootLine = currentLine;
     this.rootCharacter = currentCharacter;
     this.purpose = purpose;
     this.historyHanlder = new HistoryHandler(
       this.rootPath,
       currentFunctionName,
-      currentFunctionName
+      currentFunctionName,
+      functionCodeContent
     );
     this.runInitialTask(this.rootPath, this.rootLine, this.rootCharacter);
   }
@@ -433,7 +441,7 @@ ${functionContent}
       resultNumber = Number(result.ask);
       const newMessages = this.addMessages(`User Enter ${result.ask}`, "user");
       this.sendState(newMessages);
-      if (isNaN(resultNumber) || resultNumber > 999999) {
+      if (isNaN(resultNumber) || is7wordString(result.ask)) {
         // this.runHistoryPoint(result.ask);
         break;
       }
@@ -496,7 +504,7 @@ ${functionContent}
         continue;
       }
     }
-    if (isNaN(resultNumber) || resultNumber > 999999) {
+    if (is7wordString(result.ask)) {
       await this.runHistoryPoint(result.ask);
       return;
     }

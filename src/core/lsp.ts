@@ -18,8 +18,8 @@ export async function getFunctionContentFromLineAndCharacter(
   const failSafeFileContent = fileContentSplit
     .slice(line, line + 1)
     .join("\n");
-  const doIncludeInFailSafeIndex = failSafeFileContent.search(/\sdo[\s]+/)
-  const defIncludeInFailSafeIndex = failSafeFileContent.search(/^[\s]*def\s/);
+  const doIncludeInFailSafeIndex = failSafeFileContent.search(/\sdo\s+/)
+  const defIncludeInFailSafeIndex = failSafeFileContent.search(/^\s*def\s/);
   const arrowIncludeInFailSafeIndex = failSafeFileContent.indexOf("{");
   const failSafeIndex = [
     doIncludeInFailSafeIndex === -1 ? Infinity : doIncludeInFailSafeIndex,
@@ -82,22 +82,26 @@ export async function getFunctionContentFromLineAndCharacter(
     if (startType === "\{") {
       startArrowCount += row.match(startRegexp)?.length ?? 0;
     } else {
-      startArrowCount += row.match(/\s+do\s*/g)?.length ?? 0;
+      startArrowCount += row.match(/\bdo\b\s*(\|[^\|]*\|)?/g)?.length ?? 0;
       startArrowCount += row.match(/^\s*def\s/g)?.length ?? 0;
       const ifExistsCount = row.match(/^\s*if\s/g)?.length ?? 0;
       const untilExistsCount = row.match(/^\s*until\s/g)?.length ?? 0;
       const unlessExistsCount = row.match(/^\s*unless\s/g)?.length ?? 0;
       const whileExistsCount = row.match(/^\s*while\s/g)?.length ?? 0
+      
       const lambdaExistsCount = row.match(/^\s*lambda\s/g)?.length ?? 0;
-      if (ifExistsCount > 0 || whileExistsCount > 0 || untilExistsCount > 0 || unlessExistsCount > 0 || lambdaExistsCount > 0) {
+      const whenExistsCount = row.match(/^\s*case\s/g)?.length ?? 0;
+      const beginExistsCount = row.match(/^\s*begin(\s|$)/g)?.length ?? 0;
+      if (ifExistsCount > 0 || whileExistsCount > 0 || untilExistsCount > 0 || unlessExistsCount > 0 || lambdaExistsCount > 0 || whenExistsCount > 0 || beginExistsCount > 0) {
         const isReturnExists = row.match(/[\s]*return/g);
-        const isQuestionExists = row.match(/\?/g);
-        if (!isReturnExists && !isQuestionExists) {
+        if (!isReturnExists) {
           startArrowCount += ifExistsCount;
           startArrowCount += whileExistsCount;
           startArrowCount += untilExistsCount;
           startArrowCount += unlessExistsCount;
           startArrowCount += lambdaExistsCount;
+          startArrowCount += whenExistsCount;
+          startArrowCount += beginExistsCount;
         }
       }
     }
@@ -127,18 +131,31 @@ export async function getFileLineAndCharacterFromFunctionName(
     console.error(e);
     return [-1, -1];
   }
-  const codeLineRegexp = new RegExp(`\\s${escapeRegExp(codeLine)}[\\s\\(\\)\\{\\|]{1}`, "g");
-  const functionNameRegexp = new RegExp(`\\s*${escapeRegExp(functionName)}[\\s\\(\\)\\{\\|]{1}`, "g");
+  const codeLineRegexp = new RegExp(`\\s${escapeRegExp(codeLine)}[\\s\\(\\)\\{\\|\.]{1}`, "g");
+  const functionNameRegexp = new RegExp(`(\\s|::|\.){1}${escapeRegExp(functionName)}[\\s\\(\\)\\{\\|\.]{1}`, "g");
   const defClassFunctionRegexp = new RegExp(`\\s(def|class)\\s+${escapeRegExp(functionName)}`, "g");
-  const memberAccessFunction = functionName.split("::");
-  const memberAccessFunctionName = "::" + memberAccessFunction[memberAccessFunction.length - 1];
-  const memberAccessFunctionRegexp = new RegExp(`${escapeRegExp(memberAccessFunctionName)}\\s*[\\(\\)\\{]*`, "g")
-  const dotAccessFunction = functionName.split(".");
+  let dotAccessFunction = functionName.split(".");
   const dotAccessFunctionName = "." + dotAccessFunction[dotAccessFunction.length - 1];
-  const dotAccessFunctionRegexp = new RegExp(`${escapeRegExp(dotAccessFunctionName)}\\s*[\\(\\)\\{]*`, "g");
+  const dotAccessFunctionRegexp = new RegExp(`${escapeRegExp(dotAccessFunctionName)}[\\s\\(\\)\\{]{1}`, "g");
+  const memberAccessFunction = functionName.split("::");
+  let memberAccessFunctionRegexp;
+  if (dotAccessFunction.length === 1) {
+    const memberAccessFunctionName = "::" + memberAccessFunction[memberAccessFunction.length - 1];
+    memberAccessFunctionRegexp = new RegExp(`${escapeRegExp(memberAccessFunctionName)}[\\s\\(\\)\\{]{1}`, "g");
+  } else {
+    // consider new
+    const lastMemberAccessFunctionName = memberAccessFunction[memberAccessFunction.length - 1];
+    if (lastMemberAccessFunctionName.match(/\.new($|\s|\()/g)) {
+      const lastMemberAccessFunctionNameNewIndex = lastMemberAccessFunctionName.indexOf(".new");
+      const lastMemberAccessFunctionNameWithoutNew = lastMemberAccessFunctionName.slice(0, lastMemberAccessFunctionNameNewIndex);
+      memberAccessFunctionRegexp = new RegExp(`${escapeRegExp(lastMemberAccessFunctionNameWithoutNew)}[\\s\\(\\)\\{]{1}`, "g");
+      dotAccessFunction = [];
+    } else {
+      memberAccessFunctionRegexp = new RegExp(`${escapeRegExp(lastMemberAccessFunctionName)}[\\s\\(\\)\\{]{1}`, "g");
+    }
+  }
   const fileContentArray = fileContent.split("\n");
   let isLongComment = false;
-  console.log("dot member : ", dotAccessFunction, memberAccessFunction);
   for (let i in fileContentArray) {
     const index = isNaN(Number(i)) ? -1 : Number(i);
     const row = "\n" + fileContentArray[index] + "\n";
@@ -176,14 +193,14 @@ export async function getFileLineAndCharacterFromFunctionName(
     if (!isFirst) {
       const defOrClassMatched = row.search(defClassFunctionRegexp);
       if (defOrClassMatched !== -1) {
-        console.log("def class found...");
+        console.log("def class found... : ", row);
         continue;
       }
     }
     let functionIndex = row.search(codeLineRegexp);
     if (dotAccessFunction.length > 1 && functionIndex !== -1) {
       functionIndex = row.search(dotAccessFunctionRegexp);
-    } else if (memberAccessFunction.length > 1 && functionIndex !== -1) {
+    } else if (memberAccessFunction.length > 1 && functionIndex !== -1 && memberAccessFunctionRegexp) {
       functionIndex = row.search(memberAccessFunctionRegexp);
     } else if (functionIndex !== -1) {
       functionIndex = row.search(functionNameRegexp);

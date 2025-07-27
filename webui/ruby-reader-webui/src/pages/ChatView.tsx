@@ -24,7 +24,7 @@ const INPUT_PHASE_TEXT = [
   "", // 4
   "", // 5
   "Please enter the file path of the history JSON to start the search.", // 6
-  "Enter "Start Task" to start to explore.", // 7
+  `Enter "Start Task" to start to explore.`, // 7
 ];
 
 const ChatView: React.FC<ChatViewType> = ({

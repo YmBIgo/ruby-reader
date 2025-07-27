@@ -28,12 +28,13 @@ export class HistoryHandler {
     private choiceTree: ChoiceTree;
     private currentChoicePosition: ChoicePosition[];
     private visualizeResult: string;
-    constructor(rootPath: string, rootFunctionName: string, rootFunctionCodeLine: string) {
+    constructor(rootPath: string, rootFunctionName: string, rootFunctionCodeLine: string, rootFunctionContent: string) {
         this.rootPath = rootPath;
         const rootChoice: Choice = {
             functionName: rootFunctionName,
             functionCodeLine: rootFunctionCodeLine,
             originalFilePath: rootPath,
+            functionCodeContent: rootFunctionContent,
             id: generateHexString()
         };
         this.choiceTree = {
