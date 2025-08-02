@@ -29,9 +29,6 @@
 
 ## How to Use
 
-Ruby Reader is not yet available as a public VSCode extension.
-Once released, installation instructions will be provided here.
-
 #### Requirements
 
 * `ruby-lsp` (version 0.20.0 or later)
@@ -86,7 +83,11 @@ This process repeats as long as you like, allowing you to explore deeper step by
 
 ## Release Notes
 
-#### 1.0.0
+#### 1.0.5
+
+Save History Data When Jump
+
+#### 1.0.3
 
 Initial release of RubyReader
 

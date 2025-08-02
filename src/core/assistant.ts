@@ -577,6 +577,10 @@ ${functionContent}
       }
       functionResult = newFileContent;
     }
+    const foundCallback = (st: ChoiceTree) => {
+      st.content.functionCodeContent = functionResult ?? functionCodeLine;
+    }
+    this.historyHanlder?.moveById(historyHash, foundCallback);
     this.runTask(originalFilePath, functionResult ?? functionCodeLine);
   }
 
