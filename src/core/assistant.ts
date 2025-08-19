@@ -464,35 +464,8 @@ ${functionContent}
         continue;
       }
       if (resultNumber === 8) {
-        try {
-          const openDoc = await vscode.workspace.openTextDocument(
-            currentFilePath
-          );
-          await vscode.window.showTextDocument(openDoc, {
-            preview: false, // タブの使い回しを避ける場合は false
-            preserveFocus: false, // エディタにフォーカスを移す
-          });
-          const openDocText = openDoc.getText().split("\n");
-          const functionLines = functionContent.split("\n").filter((fcr) => {
-            return fcr.replace(/\s\t/g, "") !== "";
-          });
-          let functionStartLine = functionLines[0];
-          let functionEndLine = functionLines.at(-1);
-          const functionStartLineIndex =
-            openDocText.findIndex((odt) => odt === functionStartLine) ?? 0;
-          const positionStart = new vscode.Position(functionStartLineIndex, 0);
-          const positionEnd = new vscode.Position(
-            functionStartLineIndex + functionContent.split("\n").length,
-            functionEndLine?.length ?? 10000
-          );
-          const selection = new vscode.Selection(positionStart, positionEnd);
-          vscode.window.activeTextEditor!.selection = selection;
-          // this.saySocket("\n\n----------\n" + functionContent + "\n----------\n\n");
-          continue;
-        } catch (e) {
-          console.warn(e);
-          continue;
-        }
+        this.jumpToCode(currentFilePath, functionContent)
+        continue;
       } else if (resultNumber === 9) {
         await this.getMermaid(functionContent);
         continue;
@@ -541,11 +514,46 @@ ${functionContent}
       this.saveChoiceTree();
       return;
     }
+    this.jumpToCode(removeFilePrefixFromFilePath(newFile), newFunctionContent);
     this.historyHanlder?.choose(resultNumber, newFunctionContent);
     this.saySocket(
       `LLM is searching ${newFile}@${newLine}:${newCharacter}.`
     );
     this.runTask(removeFilePrefixFromFilePath(newFile), newFunctionContent);
+  }
+
+  private async jumpToCode(currentFilePath: string, functionContent: string) {
+    try {
+      const openDoc = await vscode.workspace.openTextDocument(
+        currentFilePath
+      );
+      await vscode.window.showTextDocument(openDoc, {
+        preview: false, // タブの使い回しを避ける場合は false
+        preserveFocus: false, // エディタにフォーカスを移す
+      });
+      const openDocText = openDoc.getText().split("\n");
+      const functionLines = functionContent.split("\n").filter((fcr) => {
+        return fcr.replace(/\s\t/g, "") !== "";
+      });
+      let functionStartLine = functionLines[0];
+      let functionEndLine = functionLines.at(-1);
+      const functionStartLineIndex =
+        openDocText.findIndex((odt) => odt === functionStartLine) ?? 0;
+      const positionStart = new vscode.Position(functionStartLineIndex, 0);
+      const positionEnd = new vscode.Position(
+        functionStartLineIndex + functionContent.split("\n").length,
+        functionEndLine?.length ?? 10000
+      );
+      const selection = new vscode.Selection(positionStart, positionEnd);
+      vscode.window.activeTextEditor!.selection = selection;
+      vscode.window.activeTextEditor?.revealRange(
+        new vscode.Range(positionStart, positionEnd),
+        vscode.TextEditorRevealType.AtTop
+      )
+      // this.saySocket("\n\n----------\n" + functionContent + "\n----------\n\n");
+    } catch (e) {
+      console.warn(e);
+    }
   }
 
   private async runHistoryPoint(historyHash: string) {
@@ -642,7 +650,7 @@ ${functionContent}
     const userPrompt = `<functions or methods>
 ${result}
 <the potential bugs (optional)>
-${description ? description : "not provided..."}
+${description.ask ? description.ask : "not provided..."}
 `;
     const history: Anthropic.MessageParam[] = [
       { role: "user", content: userPrompt },
@@ -650,8 +658,10 @@ ${description ? description : "not provided..."}
     const response =
       (await this.apiHandler?.createMessage(bugFixPrompt, history, false)) ||
       "failed to get result";
-    this.saySocket("Generate Bugs Report. Done!");
+    const fileName = `bugreport_${Date.now()}.txt`;
+    await fs.writeFile(`${this.saveReportFolder}/${fileName}`, response + "\n\n" + result);
     this.saySocket(response);
+    this.saySocket(`Generate Bugs Report Done! File is created @${this.saveReportFolder}/${fileName}`);
   }
   private async saveChoiceTree() {
     const choiceTreeWithAdditionalInfo = {

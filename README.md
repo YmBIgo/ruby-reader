@@ -83,6 +83,10 @@ This process repeats as long as you like, allowing you to explore deeper step by
 
 ## Release Notes
 
+#### 1.0.6
+
+Impl jump
+
 #### 1.0.5
 
 Save History Data When Jump
