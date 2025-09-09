@@ -6,6 +6,7 @@ export type Choice = {
     originalFilePath: string;
     id: string;
     functionCodeContent?: string;
+    comment?: string;
 }
 export type ProcessChoice = {
     functionName: string;
@@ -78,7 +79,7 @@ export class HistoryHandler {
             return;
         }
     }
-    choose(selectIndex: number, functionCodeContent: string) {
+    choose(selectIndex: number, functionCodeContent: string, comment?: string) {
         const maxDepthPosition = this.currentChoicePosition.find((ccp) =>
             ccp.depth === this.currentChoicePosition.length - 1
         );
@@ -92,6 +93,7 @@ export class HistoryHandler {
         }];
         this.searchByChoicePositionArray((choiceTree) => {
             choiceTree.content.functionCodeContent = functionCodeContent;
+            choiceTree.content.comment = comment;
         });
     }
     private searchByChoicePositionArray(callbackFn?: (choiceTree: ChoiceTree) => void) {
@@ -183,7 +185,7 @@ export class HistoryHandler {
     }
     private printTree(tree: ChoiceTree, prefix: string = "") {
         this.visualizeResult += `${prefix}|${tree.content.functionName}
-${prefix}|${tree.content.id.slice(0, 7)}
+${prefix}|${tree.content.id.slice(0, 7)} ${tree.content.comment ? `\n${prefix}  ${tree.content.comment}` : ""}
 
 `;
         for (let child of tree.children) {

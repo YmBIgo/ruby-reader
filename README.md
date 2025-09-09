@@ -83,6 +83,10 @@ This process repeats as long as you like, allowing you to explore deeper step by
 
 ## Release Notes
 
+#### 1.0.8
+
+Add comment function
+
 #### 1.0.7
 
 Interactively jump when use history run

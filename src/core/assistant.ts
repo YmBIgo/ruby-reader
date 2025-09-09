@@ -521,10 +521,13 @@ ${functionContent}
         return newHc;
       } 
       return hc
-    })
+    });
+    const comment = await this.askSocket("If you have any comments write it down.\nIf you have no comment please just write 'no comment'.");
+    const newMessages = this.addMessages(`User Enter ${comment.ask}`, "user");
+    this.sendState(newMessages);
     this.historyHanlder?.addHistory(newHistoryChoices);
     this.jumpToCode(removeFilePrefixFromFilePath(newFile), newFunctionContent);
-    this.historyHanlder?.choose(resultNumber, newFunctionContent);
+    this.historyHanlder?.choose(resultNumber, newFunctionContent, comment.ask);
     this.saySocket(
       `LLM is searching ${newFile}@${newLine}:${newCharacter}.`
     );
@@ -852,7 +855,7 @@ ${description.ask ? description.ask : "not provided..."}
     this.messages = [];
     this.sendState = () => {};
     this.historyHanlder = null;
-    this.apiHandler = buildLLMHanlder("openai", "gpt-4.1", "no key");
+    this.apiHandler = buildLLMHanlder("openai", "gpt-5", "no key");
   }
 
   handleWebViewAskResponse(askResponse: string) {
