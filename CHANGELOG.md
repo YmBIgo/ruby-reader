@@ -4,6 +4,10 @@ All notable changes to the "ruby-reader" extension will be documented in this fi
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+### 1.0.7
+
+Interactively jump when use history run
+
 ## 1.0.6
 
 Impl Jump

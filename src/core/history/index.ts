@@ -126,6 +126,30 @@ export class HistoryHandler {
         this.move(searchResult.pos);
         return searchResult.processChoice;
     }
+    getContentFromPos(
+        pos: ChoicePosition[],
+        searchChoiceTree: ChoiceTree = this.choiceTree
+    ): Choice | null {
+        if (pos.length === 1) {
+            return searchChoiceTree.content;
+        }
+        const nextPos = pos[1];
+        const nextWidth = nextPos.width;
+        if (searchChoiceTree.children[nextWidth]) {
+            return this.getContentFromPos(pos.slice(1), searchChoiceTree.children[nextWidth]);
+        }
+        return null;
+    }
+    searchTreeByIdPublic(
+        id: string
+    ): {pos: ChoicePosition[], processChoice: Choice} | null {
+        const searchResult = this.searchTreeById(this.choiceTree, id, 0, 0, []);
+        if (!searchResult || !searchResult.pos.length) {
+            console.log(`id not found for ${id} ...`);
+            return null;
+        }
+        return searchResult;
+    }
     searchTreeById(
         searchChoiceTree: ChoiceTree,
         id: string,
