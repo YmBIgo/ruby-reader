@@ -13,18 +13,21 @@ type ChatViewType = {
   setIsSettingPage: Dispatch<SetStateAction<boolean>>;
 };
 
-const INPUT_PHASE_NUMBER = [0, 1, 2, 6];
-const BACK_PHASE_NUMBER = [1, 2, 3, 6, 7];
-const SHOW_HISTORY_NUMBER = [0, 1, 2];
+const INPUT_PHASE_NUMBER = [0, 1, 2, 6, 8, 9];
+const BACK_PHASE_NUMBER = [1, 2, 3, 6, 7, 8, 9, 10];
+const SHOW_HISTORY_NUMBER = [0, 1, 2, 6, 8, 9];
 const INPUT_PHASE_TEXT = [
   `Enter "file path you want to search"`, // 0
-  `Next, enter "one-line definition of the function to search"`, // 1
+  `Next, enter "the first line of the function to search"`, // 1
   `Next, enter "Purpose"`, // 2
   `Enter "Start Task" to start to explore.`, // 3
   "", // 4
   "", // 5
   "Please enter the file path of the history JSON to start the search.", // 6
   `Enter "Start Task" to start to explore.`, // 7
+  `Please enter the folder you want to search`, // 8
+  `Please enter the purpose of folder and file search`, // 9
+  `Enter "Start Task" to start to explore.`, // 10
 ];
 
 const ChatView: React.FC<ChatViewType> = ({
@@ -40,18 +43,31 @@ const ChatView: React.FC<ChatViewType> = ({
   // 5はdisable中
   // 6はhistory入力中
   // 7はhistory確認
-  const [inputPhase, setInputPhase] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7>(
+  // 8はfolder入力中
+  // 9はfolder目的入力
+  // 10はfoler確認
+  const [inputPhase, setInputPhase] = useState<0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10>(
     0
   );
+  // normal input
   const [rootPath, setRootPath] = useState<string>("");
   const [rootFunctionName, setRootFunctionName] = useState<string>("");
   const [purpose, setPurpose] = useState<string>("");
+  // history input
   const [historyPath, setHistoryPath] = useState<string>("");
+  // folder input
+  const [folderPath, setFolderPath] = useState<string>("");
+  const [folderPurpose, setFolderPurpose] = useState<string>("");
   const task =
     rootPath && rootFunctionName && purpose
       ? `File Path you want to search : ${rootPath}
-One-line definition of the function to search: ${rootFunctionName}
+First line of the function to search: ${rootFunctionName}
 Purpose: ${purpose}`
+      : historyPath
+      ? `Input history path is ${historyPath}`
+      : folderPath && folderPurpose
+      ? `Folder Search Path you want to search : ${folderPath}
+Purpose : ${folderPurpose}`
       : "Task is not started";
 
   const lastMessage = messages[messages.length - 1];
@@ -60,7 +76,7 @@ Purpose: ${purpose}`
     inputPhase === 0
       ? `Enter "file path you want to search"`
       : inputPhase === 1
-      ? `Enter "One-line definition of the function to search"`
+      ? `Enter "First line of the function to search"`
       : inputPhase === 2
       ? "Enter Purpose"
       : inputPhase === 3
@@ -72,6 +88,12 @@ Purpose: ${purpose}`
       : inputPhase === 6
       ? `Enter "the file path of the history"`
       : inputPhase === 7
+      ? "Start Task"
+      : inputPhase === 8
+      ? "Enter the folder path you want to search"
+      : inputPhase === 9
+      ? "Enter Purpose"
+      : inputPhase === 10
       ? "Start Task"
       : "Unknown Command";
 
@@ -91,6 +113,12 @@ Purpose: ${purpose}`
       : inputPhase === 6
       ? "Back to Normal Input"
       : inputPhase === 7
+      ? "Back"
+      : inputPhase === 8
+      ? "Back to Normal Input"
+      : inputPhase === 9
+      ? "Back"
+      : inputPhase === 10
       ? "Back"
       : "Unknown Command";
 
@@ -114,7 +142,7 @@ Purpose: ${purpose}`
           {
             type: "say",
             content:
-              `Please enter the "file path you want to search", the "one-line definition of the function to search," and the "purpose."`,
+              `Please enter the "file path you want to search", the "first line of the function to search," and the "purpose."`,
             time: Date.now(),
           },
           {
@@ -138,6 +166,22 @@ Purpose: ${purpose}`
         return;
       } else if (inputPhase === 7) {
         setHistoryPath("");
+      } else if (inputPhase === 8) {
+        setMessages((m) => [
+          ...m,
+          {
+            type: "say",
+            content: INPUT_PHASE_TEXT[0],
+            time: Date.now() + 100,
+          },
+        ]);
+        setInputText("");
+        setInputPhase(0);
+        return;
+      } else if (inputPhase === 9) {
+        setFolderPath("");
+      } else if (inputPhase === 10) {
+        setFolderPurpose("");
       }
       setMessages((m) => [
         ...m,
@@ -164,6 +208,10 @@ Purpose: ${purpose}`
         setPurpose(inputText);
       } else if (inputPhase === 6) {
         setHistoryPath(inputText);
+      } else if (inputPhase === 8) {
+        setFolderPath(inputText);
+      } else if (inputPhase === 9) {
+        setFolderPurpose(inputText);
       }
       setMessages((m) => [
         ...m,
@@ -181,7 +229,7 @@ Purpose: ${purpose}`
       setInputText("");
       setInputPhase((ip) => {
         const newphase = ip + 1;
-        if (newphase < 8 && newphase >= 0) return newphase as 0 | 1 | 2 | 3 | 7;
+        if (newphase < 11 && newphase >= 0) return newphase as 0 | 1 | 2 | 3 | 7 | 9 | 10;
         return ip;
       });
     } else if (inputPhase === 3) {
@@ -209,6 +257,14 @@ Purpose: ${purpose}`
         historyPath,
       });
       setInputPhase(5);
+    } else if (inputPhase === 10) {
+      setMessages([]);
+      vscode.postMessage({
+        type: "InitFolder",
+        folder: folderPath,
+        purpose: folderPurpose
+      });
+      setInputPhase(5);
     }
   };
 
@@ -231,6 +287,26 @@ Purpose: ${purpose}`
     ]);
     setInputPhase(6);
   };
+
+  const gotoFolderPhase = () => {
+    setRootPath("");
+    setRootFunctionName("");
+    setPurpose("");
+    setMessages((m) => [
+      ...m,
+      {
+        type: "user",
+        content: "Enter from folder path",
+        time: Date.now(),
+      },
+      {
+        type: "say",
+        content: INPUT_PHASE_TEXT[8],
+        time: Date.now() + 100,
+      },
+    ]);
+    setInputPhase(8);
+  }
 
   useEffect(() => {
     if (!lastMessage) return;
@@ -289,7 +365,7 @@ Purpose: ${purpose}`
                 {
                   type: "say",
                   content:
-                    `Please enter the "file path you want to search", the "one-line definition of the function to search", and the "purpose".`,
+                    `Please enter the "file path you want to search", the "first line of the function to search", and the "purpose".`,
                   time: Date.now(),
                 },
                 {
@@ -417,12 +493,22 @@ Purpose: ${purpose}`
             paddingLeft: "10px",
           }}
         >
+          {inputPhase !== 6 &&
           <VscodeButton
             onClick={gotoHistoryPhase}
-            style={{ width: "330px", margin: "5px 10px" }}
+              style={{ width: "150px", margin: "5px 10px" }}
           >
-            Move to search using history JSON page. 
+              Move to history search
+            </VscodeButton>
+          }
+          {inputPhase !== 8 && inputPhase !== 9 &&
+            <VscodeButton
+              onClick={gotoFolderPhase}
+              style={{ width: "150px", margin: "5px 10px" }}
+            >
+              Move to folder search
           </VscodeButton>
+          }
         </div>
       )}
       <div

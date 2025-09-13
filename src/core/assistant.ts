@@ -4,14 +4,18 @@ import fs from "fs/promises";
 
 import {
   addFilePrefixToFilePath,
+  pickFunctions,
   removeFilePrefixFromFilePath,
 } from "./util/filepath";
 import { ChoiceTree, HistoryHandler, ProcessChoice } from "./history";
 import { LLMModel } from "./llm/model";
 import { Message, MessageType } from "./type/Message";
+import { Symbol } from "./type/Symbol";
 import {
   getFileLineAndCharacterFromFunctionName,
   getFunctionContentFromLineAndCharacter,
+  isSymbolInformation,
+  kindToString,
 } from "./lsp";
 import { buildLLMHanlder, LLMName } from "./llm";
 import Anthropic from "@anthropic-ai/sdk";
@@ -21,9 +25,12 @@ import {
   mermaidPrompt,
   pickCandidatePromopt,
   reportPromopt,
-} from "./prompt/index";
+  searchFolderSystemPrompt,
+  searchSymbolSystemPrompt,
+} from "./prompt";
 import pWaitFor from "p-wait-for";
 import { is7wordString } from "./util/number";
+import { DocumentSymbol, SymbolInformation } from "vscode-languageclient/node";
 
 let client: RubyLanguageClient | null;
 
@@ -188,6 +195,128 @@ export class RubyReader {
     console.log("init finished! with status", client.state);
   }
 
+  async runFirstTaskWithFolder(
+    searchFolderPath: string,
+    purpose: string
+  ) {
+    this.saySocket("This operation usually takes 2 ~ 5minutes");
+    const pickResults = await pickFunctions(searchFolderPath);
+    const flattenPickResults = pickResults
+    .reduce((a, b) => {
+      a.push(b[2])
+        return a
+    }, [] as string[][])
+    const filteredPickResults = flattenPickResults
+      .map((r) => {
+        if (!r) return null
+        return r.map((rc) => rc.replace(searchFolderPath, ""));
+    })
+    .filter(Boolean)
+    .join("\n");
+    const searchFolderPrompt = `[purpose]
+${purpose}
+[filePaths]
+${filteredPickResults}
+`;
+    const history: Anthropic.Messages.MessageParam[] = [
+      { role: "user", content: searchFolderPrompt },
+    ];
+    let responseJSON: any;
+    try {
+      const response =
+        (await this.apiHandler?.createMessage(
+          searchFolderSystemPrompt,
+          history,
+          false
+        )) ?? "{}";
+      responseJSON = JSON.parse(response);
+    } catch (e) {
+      console.error(e);
+      this.sendErrorSocket(`API Error`);
+      return;
+    }
+    if (!Array.isArray(responseJSON)) {
+      console.error("respond JSON format is not Array...");
+      this.sendErrorSocket(`Returned information is wrong...`);
+      return;
+    }
+    this.saySocket("Glob done. Next : Search Files.")
+    let folderFileNameResult: Symbol[] = [];
+    for (let j of responseJSON) {
+      const symbolResult = await this.symbolRubyLsp(searchFolderPath + j);
+      if (!symbolResult || !symbolResult.length) continue;
+      folderFileNameResult = [...folderFileNameResult, ...symbolResult]
+    }
+    folderFileNameResult = folderFileNameResult.map((f, index) => {
+      return {...f, id: index}
+    });
+    const filteredPickFunctions = folderFileNameResult.map((f) => {
+      return `id: ${f.id} / name: ${f.name} / kind: ${f.kind} / path: ${f.path.replace(searchFolderPath, "")} / parent: ${f.parent}`
+    }).join("\n");
+    const searchFilePrompt = `[purpose]
+${purpose}. And want to find the entrypoint.
+[functions]
+${filteredPickFunctions}
+`
+    const history2: Anthropic.Messages.MessageParam[] = [
+      { role: "user", content: searchFilePrompt },
+    ];
+    let responseJSON2: any;
+    try {
+      const response =
+        (await this.apiHandler?.createMessage(
+          searchSymbolSystemPrompt,
+          history2,
+          false
+        )) ?? "{}";
+      responseJSON2 = JSON.parse(response);
+    } catch (e) {
+      console.error(e);
+      this.sendErrorSocket(`API Error`);
+      return;
+    }
+    if (!Array.isArray(responseJSON2)) {
+      console.error("respond JSON format is not Array...");
+      this.sendErrorSocket(`Returned information is wrong...`);
+      return;
+    }
+    console.log(JSON.stringify(responseJSON2));
+    const openAIResultIds = responseJSON2.map((r: any) => r.id);
+    const finalSymbolResult = folderFileNameResult.filter((s) => {
+      return openAIResultIds.includes(s.id);
+    });
+    console.log(JSON.stringify(finalSymbolResult));
+    let askQuestion = "";
+    finalSymbolResult.forEach((f, index) => {
+      askQuestion += `${index} : ${f.name}\n`;
+      askQuestion += `Kind : ${f.kind}\n`;
+      askQuestion += `Path : ${f.path}\n`;
+      askQuestion += `Content : ${f.content}\n`
+      askQuestion += `----------------------------\n`;
+    });
+    let resultNumber = 0;
+    let result: AskResponse | null = null;
+    this.saySocket(`${askQuestion}`);
+    for (; ;) {
+      result = await this.askSocket(`Please enter index you want to search.`);
+      console.log(`result : ${result.ask}`);
+      resultNumber = Number(result.ask);
+      const newMessages = this.addMessages(`User Enter ${result.ask}`, "user");
+      this.sendState(newMessages);
+      if (!isNaN(resultNumber) && resultNumber < finalSymbolResult.length) {
+        break;
+      }
+      this.saySocket("Please input correct index");
+    }
+    const searchSymbolResult = finalSymbolResult[resultNumber];
+    if (!searchSymbolResult) {
+      console.error("Please input correct index");
+      this.sendErrorSocket("Please input correct index");
+      return;
+    }
+    this.runFirstTask(searchSymbolResult.path, searchSymbolResult.content, purpose);
+  }
+
   async runFirstTaskWithHistory(
     currentFilePath: string,
     currentFunctionName: string,
@@ -256,6 +385,7 @@ export class RubyReader {
       currentLine,
       currentCharacter
     );
+    this.jumpToCode(currentFilePath, functionCodeContent);
     this.rootLine = currentLine;
     this.rootCharacter = currentCharacter;
     this.purpose = purpose;
@@ -302,7 +432,7 @@ ${functionContent}
     const history: Anthropic.Messages.MessageParam[] = [
       { role: "user", content: userPrompt },
     ];
-    let responseJSON: string;
+    let responseJSON: any;
     try {
       const response =
         (await this.apiHandler?.createMessage(
@@ -427,8 +557,8 @@ ${functionContent}
     let resultNumber = 0;
     let result: AskResponse | null = null;
     this.saySocket(`${askQuestion}`);
-    for (;;) {
-      result = await this.askSocket(`Please enter the index of the detail you want to display:
+    for (; ;) {
+      result = await this.askSocket(`Please enter the index you want to display:
 - Enter 5 to retry
 - Enter 6 to display the history as a tree structure
 - Enter 7 to generate an exploration report
@@ -662,6 +792,7 @@ ${functionContent}
       st.content.functionCodeContent = functionResult ?? functionCodeLine;
     }
     this.historyHanlder?.moveById(historyHash, foundCallback);
+    if (functionResult) this.jumpToCode(originalFilePath, functionResult)
     this.runTask(originalFilePath, functionResult ?? functionCodeLine);
   }
 
@@ -838,6 +969,103 @@ ${description.ask ? description.ask : "not provided..."}
       newCharacter2
     );
     return [newFilePath2, newLine2, newCharacter2, functionContent, item2];
+  }
+
+  async doSymbolRubyLsp(
+    filePath: string
+  ): Promise<{result: any; content: string}> {
+    const fileContent = await fs.readFile(filePath, "utf-8");
+    await pWaitFor(() => !!this.isRubyLspRunning(), {
+      interval: 500,
+    });
+    await client?.sendNotification("textDocument/didOpen", {
+      textDocument: {
+        uri: addFilePrefixToFilePath(filePath),
+        languageId: "java",
+        version: 0,
+        text: fileContent,
+      },
+    });
+    let itemString: string = "";
+    await client?.sendRequest(
+      "textDocument/documentSymbol",
+      {
+        textDocument: {
+          uri: addFilePrefixToFilePath(filePath),
+        },
+      }
+    )
+    .then((result) => {
+      itemString = JSON.stringify(result);
+    });
+    let item: any = [];
+    try {
+      item = JSON.parse(itemString as any);
+    } catch (e) {
+      console.error(e);
+      this.saveChoiceTree();
+    }
+    if (!Array.isArray(item) || !item.length) {
+      return {result: [], content: fileContent}
+    }
+    await client?.sendNotification("textDocument/didClose", {
+      textDocument: {
+        uri: addFilePrefixToFilePath(filePath),
+        languageId: "java",
+        version: 0,
+        text: fileContent,
+      },
+    });
+    return {result: item, content: fileContent}
+  }
+
+  async symbolRubyLsp(filePath: string): Promise<Symbol[]> {
+    const {result, content} = await this.doSymbolRubyLsp(filePath);
+    if (!result || !content) return [];
+    const fileNameArray = filePath.split("/")
+    const splitContent = content.split("\n");
+    let childrenOpenedResult: Array<SymbolInformation | DocumentSymbol> = result
+    function openChildren(children: Array<SymbolInformation | DocumentSymbol> ) {
+      childrenOpenedResult = [...childrenOpenedResult, ...children];
+      children.forEach((c) => {
+        if (!isSymbolInformation(c) && c.children) openChildren(c.children); 
+      })
+    }
+    result.forEach((r: SymbolInformation | DocumentSymbol) => {
+      if (!isSymbolInformation(r) && r.children) openChildren(r.children); 
+    })
+    const filtered_result = childrenOpenedResult?.filter((r: any) => {
+      if (typeof r !== "object" || !r.kind) return false;
+      if (r.kind === 6 || r.kind === 12 || r.kind === 11 || r.kind === 9) return true;
+      return false
+    }).map((f: any) => {
+      if (isSymbolInformation(f)) {
+        const startLine = f.location.range.start.line;
+        const content = splitContent[startLine] || "";
+        const kind = kindToString(f.kind);
+        return {
+          name: f.name,
+          content,
+          kind,
+          range: f.location.range,
+          parent: f.containerName ?? "",
+          path: filePath
+        }
+      }
+      const startLine = f.selectionRange.start.line;
+      const content = splitContent[startLine] || "";
+      const kind = kindToString(f.kind);
+      const parent = fileNameArray[fileNameArray.length - 1] ?? "";
+      return {
+        name: f.name,
+        content,
+        kind,
+        range: f.selectionRange,
+        parent,
+        path: filePath
+      };
+    });
+    return filtered_result;
   }
 
   private isRubyLspRunning() {

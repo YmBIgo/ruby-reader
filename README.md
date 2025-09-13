@@ -83,6 +83,10 @@ This process repeats as long as you like, allowing you to explore deeper step by
 
 ## Release Notes
 
+#### 1.0.9
+
+Add Folder Search
+
 #### 1.0.8
 
 Add comment function

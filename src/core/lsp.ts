@@ -1,4 +1,5 @@
 import fs from "fs/promises";
+import { DocumentSymbol, SymbolInformation } from "vscode-languageclient/node";
 
 export async function getFunctionContentFromLineAndCharacter(
   filePath: string,
@@ -214,4 +215,42 @@ export async function getFileLineAndCharacterFromFunctionName(
 
 function escapeRegExp(str: string) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function isSymbolInformation(
+    v: DocumentSymbol | SymbolInformation
+): v is SymbolInformation {
+    return "location" in v && !("selectedRange" in v)
+}
+
+export function kindToString(kind: number): string {
+  switch (kind) {
+    case 1: return "File";
+    case 2: return "Module";
+    case 3: return "Namespace";
+    case 4: return "Package";
+    case 5: return "Class";
+    case 6: return "Method";
+    case 7: return "Property";
+    case 8: return "Field";
+    case 9: return "Constructor";
+    case 10: return "Enum";
+    case 11: return "Interface";
+    case 12: return "Function";
+    case 13: return "Variable";
+    case 14: return "Constant";
+    case 15: return "String";
+    case 16: return "Number";
+    case 17: return "Boolean";
+    case 18: return "Array";
+    case 19: return "Object";
+    case 20: return "Key";
+    case 21: return "Null";
+    case 22: return "EnumMember";
+    case 23: return "Struct";
+    case 24: return "Event";
+    case 25: return "Operator";
+    case 26: return "TypeParameter";
+    default: return `Unknown (${kind})`;
+  }
 }
